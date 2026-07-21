@@ -4,8 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ระบบจัดการรายรับ-รายจ่าย & โปรเจกต์ & ออมหุ้น</title>
-    <!-- Chart.js สำหรับวาดกราฟวงกลม -->
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Firebase SDK (Modular v9/v10 Compat) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
     <style>
         :root {
             --primary: #4f46e5;
@@ -23,10 +29,19 @@
         body { background-color: var(--bg); color: var(--text); padding: 15px; }
         .container { max-width: 1000px; margin: 0 auto; }
 
+        /* หน้า Login */
+        .auth-container { max-width: 400px; margin: 50px auto; background: var(--card-bg); padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .auth-container h2 { text-align: center; color: var(--primary); margin-bottom: 20px; }
+        .auth-toggle { text-align: center; margin-top: 15px; font-size: 0.88rem; }
+        .auth-toggle a { color: var(--primary); font-weight: bold; cursor: pointer; text-decoration: underline; }
+
+        /* แถบหัวเว็บ */
         header { background: var(--card-bg); padding: 15px 20px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
-        h1 { font-size: 1.25rem; color: var(--primary); font-weight: 700; }
-        .nav-btns { display: flex; gap: 8px; flex-wrap: wrap; }
-        .btn { padding: 8px 14px; border-radius: 8px; border: none; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: 0.2s; background: #e0e7ff; color: var(--primary); }
+        h1 { font-size: 1.2rem; color: var(--primary); font-weight: 700; }
+        .user-info { display: flex; align-items: center; gap: 10px; font-size: 0.85rem; color: var(--text-muted); }
+        
+        .nav-btns { display: flex; gap: 8px; flex-wrap: wrap; width: 100%; margin-top: 10px; }
+        .btn { padding: 8px 14px; border-radius: 8px; border: none; font-size: 0.88rem; font-weight: 600; cursor: pointer; transition: 0.2s; background: #e0e7ff; color: var(--primary); }
         .btn.active, .btn:hover { background: var(--primary); color: white; }
         .btn-danger { background: #fee2e2; color: var(--expense); }
         .btn-danger:hover { background: var(--expense); color: white; }
@@ -62,303 +77,389 @@
 <body>
 
 <div class="container">
-    <header>
-        <h1>📊 ระบบจัดการเงิน & โปรเจกต์</h1>
-        <div class="nav-btns">
-            <button class="btn active" onclick="switchView('dashboard')">📈 แดชบอร์ด</button>
-            <button class="btn" onclick="switchView('add')">➕ บันทึกรายการ</button>
-            <button class="btn" onclick="switchView('stocks')">📈 ออมหุ้น</button>
-            <button class="btn" onclick="switchView('categories')">🏷️ หมวดหมู่</button>
-            <button class="btn" onclick="switchView('projects')">📁 โปรเจกต์</button>
-        </div>
-    </header>
+    <!-- หน้าจอล็อกอิน / สมัครสมาชิก -->
+    <div id="auth-screen" class="auth-container">
+        <h2 id="auth-title">🔐 เข้าสู่ระบบ</h2>
+        <form id="auth-form" onsubmit="handleAuth(event)">
+            <label>อีเมล</label>
+            <input type="email" id="auth-email" placeholder="example@gmail.com" required>
 
-    <!-- 1. หน้า Dashboard -->
-    <div id="view-dashboard" class="view-section active">
-        <div class="card grid-3">
-            <div>
-                <label>เลือกปี</label>
-                <select id="filter-year" onchange="renderDashboard()"></select>
-            </div>
-            <div>
-                <label>เลือกเดือน</label>
-                <select id="filter-month" onchange="renderDashboard()">
-                    <option value="">-- ทุกเดือน --</option>
-                    <option value="1">มกราคม</option><option value="2">กุมภาพันธ์</option>
-                    <option value="3">มีนาคม</option><option value="4">เมษายน</option>
-                    <option value="5">พฤษภาคม</option><option value="6">มิถุนายน</option>
-                    <option value="7">กรกฎาคม</option><option value="8">สิงหาคม</option>
-                    <option value="9">กันยายน</option><option value="10">ตลุาคม</option>
-                    <option value="11">พฤศจิกายน</option><option value="12">ธันวาคม</option>
-                </select>
-            </div>
-            <div>
-                <label>เลือกโปรเจกต์</label>
-                <select id="filter-project" onchange="renderDashboard()"></select>
-            </div>
-        </div>
+            <label>รหัสผ่าน</label>
+            <input type="password" id="auth-password" placeholder="รหัสผ่านอย่างน้อย 6 หลัก" required minlength="6">
 
-        <div class="grid-3 card">
-            <div class="stat-card inc">
-                <div>รายรับรวม</div>
-                <div class="val" id="sum-inc">฿0</div>
-            </div>
-            <div class="stat-card exp">
-                <div>รายจ่ายรวม</div>
-                <div class="val" id="sum-exp">฿0</div>
-            </div>
-            <div class="stat-card bal">
-                <div>สุทธิ / คงเหลือ</div>
-                <div class="val" id="sum-bal">฿0</div>
-            </div>
-        </div>
-
-        <div class="grid-2">
-            <div class="card">
-                <h3 style="text-align: center; font-size: 0.95rem; margin-bottom: 10px;">🟢 สัดส่วนรายรับตามหมวดหมู่</h3>
-                <div class="chart-box"><canvas id="incPieChart"></canvas></div>
-            </div>
-            <div class="card">
-                <h3 style="text-align: center; font-size: 0.95rem; margin-bottom: 10px;">🔴 สัดส่วนรายจ่ายตามหมวดหมู่</h3>
-                <div class="chart-box"><canvas id="expPieChart"></canvas></div>
-            </div>
-        </div>
-
-        <div class="card" style="overflow-x: auto;">
-            <h3>📝 ประวัติรายการล่าสุด</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>วันที่</th>
-                        <th>ประเภท</th>
-                        <th>รายการ</th>
-                        <th>หมวดหมู่</th>
-                        <th>โปรเจกต์</th>
-                        <th class="text-right">จำนวนเงิน</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody id="tx-table-body"></tbody>
-            </table>
+            <button type="submit" class="form-submit" id="auth-btn">เข้าสู่ระบบ</button>
+        </form>
+        <div class="auth-toggle">
+            <span id="auth-toggle-text">ยังไม่มีบัญชีใช่ไหม?</span> 
+            <a onclick="toggleAuthMode()" id="auth-toggle-btn">สมัครสมาชิก</a>
         </div>
     </div>
 
-    <!-- 2. หน้าบันทึกรายการรายรับ-รายจ่าย -->
-    <div id="view-add" class="view-section">
-        <div class="card" style="max-width: 500px; margin: 0 auto;">
-            <h2>➕ บันทึกรายการใหม่</h2>
-            <form id="tx-form" onsubmit="handleSaveTx(event)">
-                <label>วันที่</label>
-                <input type="date" id="tx-date" required>
+    <!-- หน้าจอหลักของแอป (จะแสดงเมื่อล็อกอินแล้ว) -->
+    <div id="app-screen" style="display: none;">
+        <header>
+            <div>
+                <h1>📊 ระบบจัดการเงิน & โปรเจกต์</h1>
+            </div>
+            <div class="user-info">
+                <span id="user-email-display"></span>
+                <button class="btn btn-danger" style="padding: 4px 8px; font-size: 0.75rem;" onclick="handleLogout()">ออกจากระบบ</button>
+            </div>
+            <div class="nav-btns">
+                <button class="btn active" onclick="switchView('dashboard')">📈 แดชบอร์ด</button>
+                <button class="btn" onclick="switchView('add')">➕ บันทึกรายการ</button>
+                <button class="btn" onclick="switchView('stocks')">📈 ออมหุ้น</button>
+                <button class="btn" onclick="switchView('categories')">🏷️ หมวดหมู่</button>
+                <button class="btn" onclick="switchView('projects')">📁 โปรเจกต์</button>
+            </div>
+        </header>
 
-                <label>ประเภท</label>
-                <select id="tx-type" onchange="populateCategoryDropdown()">
-                    <option value="รายจ่าย">รายจ่าย</option>
-                    <option value="รายรับ">รายรับ</option>
-                </select>
-
-                <label>หมวดหมู่</label>
-                <select id="tx-category" required></select>
-
-                <label>รายการ / รายละเอียด (ไม่บังคับ)</label>
-                <input type="text" id="tx-item" placeholder="เช่น ค่าอาหาร, ซื้อเสื้อผ้า">
-
-                <label>จำนวนเงิน (บาท)</label>
-                <input type="number" step="0.01" id="tx-amount" placeholder="0.00" required>
-
-                <label>โปรเจกต์ (ถ้ามี)</label>
-                <select id="tx-project"></select>
-
-                <button type="submit" class="form-submit">💾 บันทึกข้อมูล</button>
-            </form>
-        </div>
-    </div>
-
-    <!-- 3. หน้าจัดการการออมหุ้น (สรุปสั้นกระชับ) -->
-    <div id="view-stocks" class="view-section">
-        <!-- การ์ดสรุปยอดออมหุ้นรวมทั้งหมด -->
-        <div class="card" style="background: #eef2ff; border: 1px solid #c7d2fe; text-align: center; padding: 15px;">
-            <div style="font-weight: bold; color: var(--primary); font-size: 1rem;">💰 ยอดเงินออมหุ้นรวมทั้งหมด</div>
-            <div id="total-stock-investment" style="font-size: 1.8rem; font-weight: bold; color: var(--primary); margin-top: 4px;">฿0</div>
-        </div>
-
-        <div class="grid-2">
-            <div class="card">
-                <h2>📈 บันทึกการออมหุ้น</h2>
-                <form onsubmit="handleSaveStock(event)">
-                    <label>วันที่</label>
-                    <input type="date" id="stock-date" required>
-
-                    <label>ชื่อหุ้น</label>
-                    <input type="text" id="stock-symbol" placeholder="เช่น PTT, AOT" required style="text-transform:uppercase;">
-
-                    <label>รายการ</label>
-                    <select id="stock-action">
-                        <option value="buy">ซื้อ (Buy)</option>
-                        <option value="sell">ขาย (Sell)</option>
+        <!-- 1. หน้า Dashboard -->
+        <div id="view-dashboard" class="view-section active">
+            <div class="card grid-3">
+                <div>
+                    <label>เลือกปี</label>
+                    <select id="filter-year" onchange="renderDashboard()"></select>
+                </div>
+                <div>
+                    <label>เลือกเดือน</label>
+                    <select id="filter-month" onchange="renderDashboard()">
+                        <option value="">-- ทุกเดือน --</option>
+                        <option value="1">มกราคม</option><option value="2">กุมภาพันธ์</option>
+                        <option value="3">มีนาคม</option><option value="4">เมษายน</option>
+                        <option value="5">พฤษภาคม</option><option value="6">มิถุนายน</option>
+                        <option value="7">กรกฎาคม</option><option value="8">สิงหาคม</option>
+                        <option value="9">กันยายน</option><option value="10">ตลุาคม</option>
+                        <option value="11">พฤศจิกายน</option><option value="12">ธันวาคม</option>
                     </select>
-
-                    <label>จำนวนหุ้น</label>
-                    <input type="number" step="1" id="stock-shares" placeholder="เช่น 100" required>
-
-                    <label>ราคาต่อหุ้น (บาท)</label>
-                    <input type="number" step="0.01" id="stock-price" placeholder="เช่น 35.50" required>
-
-                    <button type="submit" class="form-submit">💾 บันทึกการออมหุ้น</button>
-                </form>
+                </div>
+                <div>
+                    <label>เลือกโปรเจกต์</label>
+                    <select id="filter-project" onchange="renderDashboard()"></select>
+                </div>
             </div>
 
-            <div class="card">
-                <h2 style="text-align: center;">🍕 สัดส่วนพอร์ตหุ้น</h2>
-                <div class="chart-box" style="margin-top: 15px;"><canvas id="stockPieChart"></canvas></div>
+            <div class="grid-3 card">
+                <div class="stat-card inc">
+                    <div>รายรับรวม</div>
+                    <div class="val" id="sum-inc">฿0</div>
+                </div>
+                <div class="stat-card exp">
+                    <div>รายจ่ายรวม</div>
+                    <div class="val" id="sum-exp">฿0</div>
+                </div>
+                <div class="stat-card bal">
+                    <div>สุทธิ / คงเหลือ</div>
+                    <div class="val" id="sum-bal">฿0</div>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <h3 style="text-align: center; font-size: 0.95rem; margin-bottom: 10px;">🟢 สัดส่วนรายรับตามหมวดหมู่</h3>
+                    <div class="chart-box"><canvas id="incPieChart"></canvas></div>
+                </div>
+                <div class="card">
+                    <h3 style="text-align: center; font-size: 0.95rem; margin-bottom: 10px;">🔴 สัดส่วนรายจ่ายตามหมวดหมู่</h3>
+                    <div class="chart-box"><canvas id="expPieChart"></canvas></div>
+                </div>
+            </div>
+
+            <div class="card" style="overflow-x: auto;">
+                <h3>📝 ประวัติรายการล่าสุด</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>วันที่</th>
+                            <th>ประเภท</th>
+                            <th>รายการ</th>
+                            <th>หมวดหมู่</th>
+                            <th>โปรเจกต์</th>
+                            <th class="text-right">จำนวนเงิน</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="tx-table-body"></tbody>
+                </table>
             </div>
         </div>
 
-        <!-- สรุปพอร์ตหุ้นแบบดูง่าย (ยอดเงินออมรวมรายตัว) -->
-        <div class="card" style="overflow-x: auto;">
-            <h2>💼 สรุปยอดเงินออมรายตัวหุ้น</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>ชื่อหุ้น</th>
-                        <th class="text-right">จำนวนหุ้นรวม</th>
-                        <th class="text-right">ยอดออมรวม (บาท)</th>
-                        <th class="text-right">ราคาเฉลี่ย / หุ้น</th>
-                    </tr>
-                </thead>
-                <tbody id="stock-portfolio-body"></tbody>
-            </table>
-        </div>
-
-        <div class="card" style="overflow-x: auto;">
-            <h2>📝 ประวัติการซื้อขายหุ้น</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>วันที่</th>
-                        <th>หุ้น</th>
-                        <th>รายการ</th>
-                        <th class="text-right">จำนวนหุ้น</th>
-                        <th class="text-right">ราคา/หุ้น</th>
-                        <th class="text-right">รวมเป็นเงิน</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody id="stock-history-body"></tbody>
-            </table>
-        </div>
-    </div>
-
-    <!-- 4. หน้าจัดการหมวดหมู่ -->
-    <div id="view-categories" class="view-section">
-        <div class="grid-2">
-            <div class="card">
-                <h2>➕ เพิ่มหมวดหมู่ใหม่</h2>
-                <form onsubmit="handleAddCategory(event)">
-                    <label>ชื่อหมวดหมู่</label>
-                    <input type="text" id="cat-name" placeholder="เช่น ค่าเดินทาง, ปันผล" required>
+        <!-- 2. หน้าบันทึกรายการ -->
+        <div id="view-add" class="view-section">
+            <div class="card" style="max-width: 500px; margin: 0 auto;">
+                <h2>➕ บันทึกรายการใหม่</h2>
+                <form id="tx-form" onsubmit="handleSaveTx(event)">
+                    <label>วันที่</label>
+                    <input type="date" id="tx-date" required>
 
                     <label>ประเภท</label>
-                    <select id="cat-type">
+                    <select id="tx-type" onchange="populateCategoryDropdown()">
                         <option value="รายจ่าย">รายจ่าย</option>
                         <option value="รายรับ">รายรับ</option>
                     </select>
 
-                    <button type="submit" class="form-submit">เพิ่มหมวดหมู่</button>
+                    <label>หมวดหมู่</label>
+                    <select id="tx-category" required></select>
+
+                    <label>รายการ / รายละเอียด (ไม่บังคับ)</label>
+                    <input type="text" id="tx-item" placeholder="เช่น ค่าอาหาร, ซื้อเสื้อผ้า">
+
+                    <label>จำนวนเงิน (บาท)</label>
+                    <input type="number" step="0.01" id="tx-amount" placeholder="0.00" required>
+
+                    <label>โปรเจกต์ (ถ้ามี)</label>
+                    <select id="tx-project"></select>
+
+                    <button type="submit" class="form-submit">💾 บันทึกข้อมูล</button>
                 </form>
-            </div>
-            <div class="card" style="max-height: 400px; overflow-y: auto;">
-                <h2>🏷️ รายการหมวดหมู่ทั้งหมด</h2>
-                <table>
-                    <thead>
-                        <tr><th>หมวดหมู่</th><th>ประเภท</th><th>จัดการ</th></tr>
-                    </thead>
-                    <tbody id="cat-table-body"></tbody>
-                </table>
             </div>
         </div>
-    </div>
 
-    <!-- 5. หน้าจัดการโปรเจกต์ -->
-    <div id="view-projects" class="view-section">
-        <div class="grid-2">
-            <div class="card">
-                <h2>📁 เพิ่มโปรเจกต์ใหม่</h2>
-                <form onsubmit="handleAddProject(event)">
-                    <label>ชื่อโปรเจกต์</label>
-                    <input type="text" id="proj-name" placeholder="เช่น งานพี่เอ, โปรเจกต์ C" required>
-                    <button type="submit" class="form-submit">เพิ่มโปรเจกต์</button>
-                </form>
+        <!-- 3. หน้าจัดการการออมหุ้น -->
+        <div id="view-stocks" class="view-section">
+            <div class="card" style="background: #eef2ff; border: 1px solid #c7d2fe; text-align: center; padding: 15px;">
+                <div style="font-weight: bold; color: var(--primary); font-size: 1rem;">💰 ยอดเงินออมหุ้นรวมทั้งหมด</div>
+                <div id="total-stock-investment" style="font-size: 1.8rem; font-weight: bold; color: var(--primary); margin-top: 4px;">฿0</div>
             </div>
-            <div class="card">
-                <h2>📂 สรุปกำไร/ขาดทุน รายโปรเจกต์</h2>
+
+            <div class="grid-2">
+                <div class="card">
+                    <h2>📈 บันทึกการออมหุ้น</h2>
+                    <form onsubmit="handleSaveStock(event)">
+                        <label>วันที่</label>
+                        <input type="date" id="stock-date" required>
+
+                        <label>ชื่อหุ้น</label>
+                        <input type="text" id="stock-symbol" placeholder="เช่น PTT, AOT" required style="text-transform:uppercase;">
+
+                        <label>รายการ</label>
+                        <select id="stock-action">
+                            <option value="buy">ซื้อ (Buy)</option>
+                            <option value="sell">ขาย (Sell)</option>
+                        </select>
+
+                        <label>จำนวนหุ้น</label>
+                        <input type="number" step="1" id="stock-shares" placeholder="เช่น 100" required>
+
+                        <label>ราคาต่อหุ้น (บาท)</label>
+                        <input type="number" step="0.01" id="stock-price" placeholder="เช่น 35.50" required>
+
+                        <button type="submit" class="form-submit">💾 บันทึกการออมหุ้น</button>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h2 style="text-align: center;">🍕 สัดส่วนพอร์ตหุ้น</h2>
+                    <div class="chart-box" style="margin-top: 15px;"><canvas id="stockPieChart"></canvas></div>
+                </div>
+            </div>
+
+            <div class="card" style="overflow-x: auto;">
+                <h2>💼 สรุปยอดเงินออมรายตัวหุ้น</h2>
                 <table>
                     <thead>
                         <tr>
-                            <th>ชื่อโปรเจกต์</th>
-                            <th class="text-right">รายรับ</th>
-                            <th class="text-right">รายจ่าย</th>
-                            <th class="text-right">กำไร/ขาดทุน</th>
+                            <th>ชื่อหุ้น</th>
+                            <th class="text-right">จำนวนหุ้นรวม</th>
+                            <th class="text-right">ยอดออมรวม (บาท)</th>
+                            <th class="text-right">ราคาเฉลี่ย / หุ้น</th>
                         </tr>
                     </thead>
-                    <tbody id="proj-summary-body"></tbody>
+                    <tbody id="stock-portfolio-body"></tbody>
                 </table>
+            </div>
+
+            <div class="card" style="overflow-x: auto;">
+                <h2>📝 ประวัติการซื้อขายหุ้น</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>วันที่</th>
+                            <th>หุ้น</th>
+                            <th>รายการ</th>
+                            <th class="text-right">จำนวนหุ้น</th>
+                            <th class="text-right">ราคา/หุ้น</th>
+                            <th class="text-right">รวมเป็นเงิน</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="stock-history-body"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 4. หน้าจัดการหมวดหมู่ -->
+        <div id="view-categories" class="view-section">
+            <div class="grid-2">
+                <div class="card">
+                    <h2>➕ เพิ่มหมวดหมู่ใหม่</h2>
+                    <form onsubmit="handleAddCategory(event)">
+                        <label>ชื่อหมวดหมู่</label>
+                        <input type="text" id="cat-name" placeholder="เช่น ค่าเดินทาง, ปันผล" required>
+
+                        <label>ประเภท</label>
+                        <select id="cat-type">
+                            <option value="รายจ่าย">รายจ่าย</option>
+                            <option value="รายรับ">รายรับ</option>
+                        </select>
+
+                        <button type="submit" class="form-submit">เพิ่มหมวดหมู่</button>
+                    </form>
+                </div>
+                <div class="card" style="max-height: 400px; overflow-y: auto;">
+                    <h2>🏷️ รายการหมวดหมู่ทั้งหมด</h2>
+                    <table>
+                        <thead>
+                            <tr><th>หมวดหมู่</th><th>ประเภท</th><th>จัดการ</th></tr>
+                        </thead>
+                        <tbody id="cat-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. หน้าจัดการโปรเจกต์ -->
+        <div id="view-projects" class="view-section">
+            <div class="grid-2">
+                <div class="card">
+                    <h2>📁 เพิ่มโปรเจกต์ใหม่</h2>
+                    <form onsubmit="handleAddProject(event)">
+                        <label>ชื่อโปรเจกต์</label>
+                        <input type="text" id="proj-name" placeholder="เช่น งานพี่เอ, โปรเจกต์ C" required>
+                        <button type="submit" class="form-submit">เพิ่มโปรเจกต์</button>
+                    </form>
+                </div>
+                <div class="card">
+                    <h2>📂 สรุปกำไร/ขาดทุน รายโปรเจกต์</h2>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ชื่อโปรเจกต์</th>
+                                <th class="text-right">รายรับ</th>
+                                <th class="text-right">รายจ่าย</th>
+                                <th class="text-right">กำไร/ขาดทุน</th>
+                            </tr>
+                        </thead>
+                        <tbody id="proj-summary-body"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-    let db = {
-        transactions: JSON.parse(localStorage.getItem('my_txs')) || [
-            { id: 1, date: '2025-06-15', type: 'รายรับ', item: 'มัดจำงาน', category: 'มัดจำงาน', amount: 3800, project: 'งานพี่เอ' },
-            { id: 2, date: '2025-06-15', type: 'รายจ่าย', item: 'ซื้อเสื้อ', category: 'วัตถุดิบ', amount: 1500, project: 'งานพี่เอ' },
-            { id: 3, date: '2025-06-16', type: 'รายจ่าย', item: 'ค่าขนส่ง', category: 'ค่าขนส่ง', amount: 500, project: 'งานพี่เอ' },
-            { id: 4, date: '2025-06-17', type: 'รายจ่าย', item: 'ค่าเดินทาง', category: 'ค่าเดินทาง', amount: 250, project: 'งานพี่เอ' },
-            { id: 5, date: '2025-06-20', type: 'รายรับ', item: 'เงิน Youtube', category: 'เงินจาก Youtube', amount: 4000, project: '' },
-            { id: 6, date: '2025-06-20', type: 'รายรับ', item: 'ดอกเบี้ย', category: 'ดอกเบี้ย', amount: 200, project: '' },
-            { id: 7, date: '2025-06-26', type: 'รายจ่าย', item: 'อาหาร', category: 'ค่าอาหาร', amount: 4000, project: '' }
-        ],
-        stocks: JSON.parse(localStorage.getItem('my_stocks')) || [
-            { id: 1, date: '2025-06-01', symbol: 'PTT', action: 'buy', shares: 100, price: 34.50 },
-            { id: 2, date: '2025-06-15', symbol: 'AOT', action: 'buy', shares: 200, price: 62.00 }
-        ],
-        categories: JSON.parse(localStorage.getItem('my_cats')) || [
-            { name: 'เงินเดือนหลัก', type: 'รายรับ' },
-            { name: 'เงินโบนัส', type: 'รายรับ' },
-            { name: 'ดอกเบี้ย', type: 'รายรับ' },
-            { name: 'เงินปันผล', type: 'รายรับ' },
-            { name: 'เงินจาก Youtube', type: 'รายรับ' },
-            { name: 'Affiliate', type: 'รายรับ' },
-            { name: 'มัดจำงาน', type: 'รายรับ' },
-            { name: 'ค่าอาหาร', type: 'รายจ่าย' },
-            { name: 'สุขภาพ', type: 'รายจ่าย' },
-            { name: 'ค่าเช่า', type: 'รายจ่าย' },
-            { name: 'บันเทิง', type: 'รายจ่าย' },
-            { name: 'ทำบุญ', type: 'รายจ่าย' },
-            { name: 'เกี่ยวกับลูก', type: 'รายจ่าย' },
-            { name: 'เกี่ยวกับครอบครัว', type: 'รายจ่าย' },
-            { name: 'ท่องเที่ยว', type: 'รายจ่าย' },
-            { name: 'ค่าน้ำ ค่าไฟ', type: 'รายจ่าย' },
-            { name: 'ค่าโทรศัพท์', type: 'รายจ่าย' },
-            { name: 'วัตถุดิบ', type: 'รายจ่าย' },
-            { name: 'ค่าขนส่ง', type: 'รายจ่าย' },
-            { name: 'ค่าเดินทาง', type: 'รายจ่าย' }
-        ],
-        projects: JSON.parse(localStorage.getItem('my_projs')) || ['โปรเจกต์ A', 'โปรเจกต์ B', 'โปรเจกต์ C', 'งานพี่เอ']
+    // --- Firebase Configuration ---
+    const firebaseConfig = {
+        apiKey: "AIzaSyC-xC30S0XAyItbK4o5p2IuvGyP3MfGqmQ",
+        authDomain: "my-finance-1d9f6.firebaseapp.com",
+        projectId: "my-finance-1d9f6",
+        storageBucket: "my-finance-1d9f6.firebasestorage.app",
+        messagingSenderId: "662963607241",
+        appId: "1:662963607241:web:a14864d3acf3d3c0aa1f18",
+        measurementId: "G-RYBKL16DR0"
     };
 
-    function saveData() {
-        localStorage.setItem('my_txs', JSON.stringify(db.transactions));
-        localStorage.setItem('my_stocks', JSON.stringify(db.stocks));
-        localStorage.setItem('my_cats', JSON.stringify(db.categories));
-        localStorage.setItem('my_projs', JSON.stringify(db.projects));
-    }
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    let currentUser = null;
+    let isLoginMode = true;
+
+    let appData = {
+        transactions: [],
+        stocks: [],
+        categories: [
+            { name: 'เงินเดือนหลัก', type: 'รายรับ' }, { name: 'เงินโบนัส', type: 'รายรับ' },
+            { name: 'ดอกเบี้ย', type: 'รายรับ' }, { name: 'เงินปันผล', type: 'รายรับ' },
+            { name: 'เงินจาก Youtube', type: 'รายรับ' }, { name: 'Affiliate', type: 'รายรับ' },
+            { name: 'มัดจำงาน', type: 'รายรับ' }, { name: 'ค่าอาหาร', type: 'รายจ่าย' },
+            { name: 'สุขภาพ', type: 'รายจ่าย' }, { name: 'ค่าเช่า', type: 'รายจ่าย' },
+            { name: 'บันเทิง', type: 'รายจ่าย' }, { name: 'ทำบุญ', type: 'รายจ่าย' },
+            { name: 'เกี่ยวกับลูก', type: 'รายจ่าย' }, { name: 'เกี่ยวกับครอบครัว', type: 'รายจ่าย' },
+            { name: 'ท่องเที่ยว', type: 'รายจ่าย' }, { name: 'ค่าน้ำ ค่าไฟ', type: 'รายจ่าย' },
+            { name: 'ค่าโทรศัพท์', type: 'รายจ่าย' }, { name: 'วัตถุดิบ', type: 'รายจ่าย' },
+            { name: 'ค่าขนส่ง', type: 'รายจ่าย' }, { name: 'ค่าเดินทาง', type: 'รายจ่าย' }
+        ],
+        projects: ['โปรเจกต์ A', 'โปรเจกต์ B', 'โปรเจกต์ C', 'งานพี่เอ']
+    };
 
     let incChart = null, expChart = null, stockChart = null;
     const colors = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 
-    window.onload = function() {
+    // ตรวจสอบการล็อกอิน
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            currentUser = user;
+            document.getElementById('auth-screen').style.display = 'none';
+            document.getElementById('app-screen').style.display = 'block';
+            document.getElementById('user-email-display').innerText = user.email;
+            loadUserData();
+        } else {
+            currentUser = null;
+            document.getElementById('auth-screen').style.display = 'block';
+            document.getElementById('app-screen').style.display = 'none';
+        }
+    });
+
+    // สลับโหมด Login / Register
+    function toggleAuthMode() {
+        isLoginMode = !isLoginMode;
+        document.getElementById('auth-title').innerText = isLoginMode ? '🔐 เข้าสู่ระบบ' : '📝 สมัครสมาชิก';
+        document.getElementById('auth-btn').innerText = isLoginMode ? 'เข้าสู่ระบบ' : 'ลงทะเบียน';
+        document.getElementById('auth-toggle-text').innerText = isLoginMode ? 'ยังไม่มีบัญชีใช่ไหม?' : 'มีบัญชีอยู่แล้วใช่ไหม?';
+        document.getElementById('auth-toggle-btn').innerText = isLoginMode ? 'สมัครสมาชิก' : 'เข้าสู่ระบบ';
+    }
+
+    // จัดการ Login/Register
+    function handleAuth(e) {
+        e.preventDefault();
+        const email = document.getElementById('auth-email').value;
+        const password = document.getElementById('auth-password').value;
+
+        if (isLoginMode) {
+            auth.signInWithEmailAndPassword(email, password)
+                .catch(err => alert('❌ เข้าสู่ระบบไม่สำเร็จ: ' + err.message));
+        } else {
+            auth.createUserWithEmailAndPassword(email, password)
+                .then(userCredential => {
+                    alert('✅ สมัครสมาชิกเรียบร้อยแล้ว!');
+                    saveUserData(); // สร้างฐานข้อมูลเริ่มต้น
+                })
+                .catch(err => alert('❌ สมัครสมาชิกไม่สำเร็จ: ' + err.message));
+        }
+    }
+
+    function handleLogout() {
+        auth.signOut();
+    }
+
+    // โหลดข้อมูลจาก Firestore
+    function loadUserData() {
+        if (!currentUser) return;
+        db.collection('users').doc(currentUser.uid).get().then(doc => {
+            if (doc.exists) {
+                const data = doc.data();
+                appData.transactions = data.transactions || [];
+                appData.stocks = data.stocks || [];
+                if (data.categories && data.categories.length > 0) appData.categories = data.categories;
+                if (data.projects && data.projects.length > 0) appData.projects = data.projects;
+            } else {
+                saveUserData();
+            }
+            initAppUI();
+        }).catch(err => console.error("Error loading user data:", err));
+    }
+
+    // บันทึกข้อมูลขึ้น Firestore
+    function saveUserData() {
+        if (!currentUser) return;
+        db.collection('users').doc(currentUser.uid).set(appData)
+            .catch(err => console.error("Error saving data:", err));
+    }
+
+    function initAppUI() {
         document.getElementById('tx-date').valueAsDate = new Date();
         document.getElementById('stock-date').valueAsDate = new Date();
         initYearDropdown();
@@ -368,7 +469,7 @@
         renderCategoryList();
         renderProjectSummary();
         renderStockPage();
-    };
+    }
 
     function switchView(viewName) {
         document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
@@ -387,7 +488,7 @@
         const currentYear = new Date().getFullYear();
         yearSelect.innerHTML = '<option value="">-- ทุกปี --</option>';
         for(let y = currentYear; y >= currentYear - 3; y--) {
-            yearSelect.innerHTML += `<option value="${y}" ${y === 2025 ? 'selected' : ''}>${y}</option>`;
+            yearSelect.innerHTML += `<option value="${y}" ${y === 2026 ? 'selected' : ''}>${y}</option>`;
         }
     }
 
@@ -395,7 +496,7 @@
         const type = document.getElementById('tx-type').value;
         const catSelect = document.getElementById('tx-category');
         catSelect.innerHTML = '';
-        db.categories.filter(c => c.type === type).forEach(c => {
+        appData.categories.filter(c => c.type === type).forEach(c => {
             catSelect.innerHTML += `<option value="${c.name}">${c.name}</option>`;
         });
     }
@@ -407,7 +508,7 @@
         projSelect.innerHTML = '<option value="">-- ไม่ระบุโปรเจกต์ --</option>';
         filterProjSelect.innerHTML = '<option value="">-- ทุกโปรเจกต์ --</option>';
 
-        db.projects.forEach(p => {
+        appData.projects.forEach(p => {
             projSelect.innerHTML += `<option value="${p}">${p}</option>`;
             filterProjSelect.innerHTML += `<option value="${p}">${p}</option>`;
         });
@@ -418,7 +519,7 @@
         const m = document.getElementById('filter-month').value;
         const p = document.getElementById('filter-project').value;
 
-        let filtered = db.transactions.filter(tx => {
+        let filtered = appData.transactions.filter(tx => {
             const d = new Date(tx.date);
             if (y && d.getFullYear() != parseInt(y)) return false;
             if (m && (d.getMonth() + 1) != parseInt(m)) return false;
@@ -501,8 +602,8 @@
             amount: parseFloat(document.getElementById('tx-amount').value),
             project: document.getElementById('tx-project').value
         };
-        db.transactions.push(newTx);
-        saveData();
+        appData.transactions.push(newTx);
+        saveUserData();
         alert('✅ บันทึกรายการเรียบร้อย');
         document.getElementById('tx-item').value = '';
         document.getElementById('tx-amount').value = '';
@@ -511,13 +612,12 @@
 
     function handleDeleteTx(id) {
         if (confirm('ยืนยันการลบรายการนี้?')) {
-            db.transactions = db.transactions.filter(t => t.id !== id);
-            saveData();
+            appData.transactions = appData.transactions.filter(t => t.id !== id);
+            saveUserData();
             renderDashboard();
         }
     }
 
-    // --- ส่วนจัดการออมหุ้น ---
     function handleSaveStock(e) {
         e.preventDefault();
         const newStock = {
@@ -528,8 +628,8 @@
             shares: parseInt(document.getElementById('stock-shares').value),
             price: parseFloat(document.getElementById('stock-price').value)
         };
-        db.stocks.push(newStock);
-        saveData();
+        appData.stocks.push(newStock);
+        saveUserData();
         alert('✅ บันทึกการออมหุ้นเรียบร้อย');
         document.getElementById('stock-symbol').value = '';
         document.getElementById('stock-shares').value = '';
@@ -539,8 +639,8 @@
 
     function handleDeleteStock(id) {
         if (confirm('ยืนยันการลบรายการหุ้นนี้?')) {
-            db.stocks = db.stocks.filter(s => s.id !== id);
-            saveData();
+            appData.stocks = appData.stocks.filter(s => s.id !== id);
+            saveUserData();
             renderStockPage();
         }
     }
@@ -554,7 +654,7 @@
         let portfolio = {};
         let grandTotalInvestment = 0;
 
-        db.stocks.sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(s => {
+        appData.stocks.sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(s => {
             const total = s.shares * s.price;
             historyBody.innerHTML += `
                 <tr>
@@ -596,7 +696,6 @@
             }
         }
 
-        // อัปเดตการ์ดแสดงยอดเงินออมรวมทั้งหมด
         document.getElementById('total-stock-investment').innerText = '฿' + grandTotalInvestment.toLocaleString();
 
         if (Object.keys(stockChartData).length === 0) {
@@ -611,12 +710,12 @@
         const name = document.getElementById('cat-name').value.trim();
         const type = document.getElementById('cat-type').value;
 
-        if (db.categories.some(c => c.name === name && c.type === type)) {
+        if (appData.categories.some(c => c.name === name && c.type === type)) {
             alert('❌ มีหมวดหมู่นี้อยู่แล้ว');
             return;
         }
-        db.categories.push({ name, type });
-        saveData();
+        appData.categories.push({ name, type });
+        saveUserData();
         document.getElementById('cat-name').value = '';
         populateCategoryDropdown();
         renderCategoryList();
@@ -626,7 +725,7 @@
     function renderCategoryList() {
         const tbody = document.getElementById('cat-table-body');
         tbody.innerHTML = '';
-        db.categories.forEach((c, idx) => {
+        appData.categories.forEach((c, idx) => {
             tbody.innerHTML += `
                 <tr>
                     <td>${c.name}</td>
@@ -639,8 +738,8 @@
 
     function handleDeleteCat(idx) {
         if(confirm('ยืนยันลบหมวดหมู่นี้?')) {
-            db.categories.splice(idx, 1);
-            saveData();
+            appData.categories.splice(idx, 1);
+            saveUserData();
             populateCategoryDropdown();
             renderCategoryList();
         }
@@ -649,12 +748,12 @@
     function handleAddProject(e) {
         e.preventDefault();
         const name = document.getElementById('proj-name').value.trim();
-        if (db.projects.includes(name)) {
+        if (appData.projects.includes(name)) {
             alert('❌ มีโปรเจกต์นี้อยู่แล้ว');
             return;
         }
-        db.projects.push(name);
-        saveData();
+        appData.projects.push(name);
+        saveUserData();
         document.getElementById('proj-name').value = '';
         populateProjectDropdowns();
         renderProjectSummary();
@@ -665,9 +764,9 @@
         const tbody = document.getElementById('proj-summary-body');
         tbody.innerHTML = '';
 
-        db.projects.forEach(p => {
+        appData.projects.forEach(p => {
             let inc = 0, exp = 0;
-            db.transactions.filter(t => t.project === p).forEach(t => {
+            appData.transactions.filter(t => t.project === p).forEach(t => {
                 if(t.type === 'รายรับ') inc += t.amount;
                 else exp += t.amount;
             });
