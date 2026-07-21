@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ระบบจัดการรายรับ-รายจ่าย & โปรเจกต์</title>
-    <!-- Chart.js -->
+    <!-- Chart.js สำหรับวาดกราฟวงกลม -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
@@ -163,8 +163,8 @@
                 <label>หมวดหมู่</label>
                 <select id="tx-category" required></select>
 
-                <label>รายการ / รายละเอียด</label>
-                <input type="text" id="tx-item" placeholder="เช่น ค่าอาหาร, เงินเดือน" required>
+                <label>รายการ / รายละเอียด (ไม่บังคับ)</label>
+                <input type="text" id="tx-item" placeholder="เช่น ค่าอาหาร, ซื้อเสื้อผ้า">
 
                 <label>จำนวนเงิน (บาท)</label>
                 <input type="number" step="0.01" id="tx-amount" placeholder="0.00" required>
@@ -237,7 +237,7 @@
 </div>
 
 <script>
-    // LocalStorage Data Structure
+    // โครงสร้างข้อมูล LocalStorage
     let db = {
         transactions: JSON.parse(localStorage.getItem('my_txs')) || [
             { id: 1, date: '2025-06-15', type: 'รายรับ', item: 'มัดจำงาน', category: 'มัดจำงาน', amount: 3800, project: 'งานพี่เอ' },
@@ -365,7 +365,7 @@
         document.getElementById('sum-exp').innerText = '฿' + totalExp.toLocaleString();
         document.getElementById('sum-bal').innerText = '฿' + (totalInc - totalExp).toLocaleString();
 
-        // ตาราง
+        // ตารางประวัติ
         const tbody = document.getElementById('tx-table-body');
         tbody.innerHTML = '';
         if (filtered.length === 0) {
@@ -376,7 +376,7 @@
                 tr.innerHTML = `
                     <td>${tx.date}</td>
                     <td><span class="badge ${tx.type === 'รายรับ' ? 'badge-inc' : 'badge-exp'}">${tx.type}</span></td>
-                    <td><strong>${tx.item}</strong></td>
+                    <td><strong>${tx.item || '-'}</strong></td>
                     <td>${tx.category}</td>
                     <td>${tx.project || '-'}</td>
                     <td class="text-right">฿${tx.amount.toLocaleString()}</td>
@@ -421,7 +421,7 @@
             date: document.getElementById('tx-date').value,
             type: document.getElementById('tx-type').value,
             category: document.getElementById('tx-category').value,
-            item: document.getElementById('tx-item').value,
+            item: document.getElementById('tx-item').value.trim(),
             amount: parseFloat(document.getElementById('tx-amount').value),
             project: document.getElementById('tx-project').value
         };
