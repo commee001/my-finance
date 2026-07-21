@@ -245,8 +245,16 @@
                         <label>วันที่</label>
                         <input type="date" id="stock-date" required>
 
-                        <label>ชื่อหุ้น</label>
-                        <input type="text" id="stock-symbol" placeholder="เช่น PTT, AOT" required style="text-transform:uppercase;">
+                        <label>เลือกหุ้นในระบบ</label>
+                        <select id="stock-select" onchange="toggleNewStockInput()">
+                            <option value="">-- เลือกชื่อหุ้น --</option>
+                            <option value="__NEW__">➕ เพิ่มหุ้นตัวใหม่...</option>
+                        </select>
+
+                        <div id="new-stock-container" style="display: none; margin-top: 5px;">
+                            <label>ระบุชื่อหุ้นใหม่</label>
+                            <input type="text" id="stock-symbol-new" placeholder="เช่น BRK.B, NVDA, PTT" style="text-transform:uppercase;">
+                        </div>
 
                         <label>รายการ</label>
                         <select id="stock-action">
@@ -255,10 +263,10 @@
                         </select>
 
                         <label>จำนวนหุ้น</label>
-                        <input type="number" step="1" id="stock-shares" placeholder="เช่น 100" required>
+                        <input type="number" step="any" id="stock-shares" placeholder="เช่น 0.0183" required>
 
                         <label>ราคาต่อหุ้น (บาท)</label>
-                        <input type="number" step="0.01" id="stock-price" placeholder="เช่น 35.50" required>
+                        <input type="number" step="0.01" id="stock-price" placeholder="เช่น 16355.37" required>
 
                         <button type="submit" class="form-submit">💾 บันทึกการออมหุ้น</button>
                     </form>
@@ -386,6 +394,7 @@
     let appData = {
         transactions: [],
         stocks: [],
+        stockSymbols: ['BRK.B', 'PTT', 'AOT', 'NVDA', 'AAPL'], // หมวดหมู่ชื่อหุ้นสะสม
         categories: [
             { name: 'เงินเดือนหลัก', type: 'รายรับ' }, { name: 'เงินโบนัส', type: 'รายรับ' },
             { name: 'ดอกเบี้ย', type: 'รายรับ' }, { name: 'เงินปันผล', type: 'รายรับ' },
@@ -419,7 +428,6 @@
         }
     });
 
-    // ล็อกอินด้วย Google
     function handleGoogleLogin() {
         const provider = new firebase.auth.GoogleAuthProvider();
         auth.signInWithPopup(provider).catch(err => {
@@ -427,7 +435,6 @@
         });
     }
 
-    // สลับโหมด Login / Register (Email)
     function toggleAuthMode() {
         isLoginMode = !isLoginMode;
         document.getElementById('auth-title').innerText = isLoginMode ? '🔐 เข้าสู่ระบบ' : '📝 สมัครสมาชิก';
@@ -436,7 +443,6 @@
         document.getElementById('auth-toggle-btn').innerText = isLoginMode ? 'สมัครสมาชิก' : 'เข้าสู่ระบบ';
     }
 
-    // จัดการ Email Login/Register
     function handleAuth(e) {
         e.preventDefault();
         const email = document.getElementById('auth-email').value;
@@ -466,6 +472,7 @@
                 const data = doc.data();
                 appData.transactions = data.transactions || [];
                 appData.stocks = data.stocks || [];
+                if (data.stockSymbols && data.stockSymbols.length > 0) appData.stockSymbols = data.stockSymbols;
                 if (data.categories && data.categories.length > 0) appData.categories = data.categories;
                 if (data.projects && data.projects.length > 0) appData.projects = data.projects;
             } else {
@@ -487,6 +494,7 @@
         initYearDropdown();
         populateCategoryDropdown();
         populateProjectDropdowns();
+        populateStockDropdown();
         renderDashboard();
         renderCategoryList();
         renderProjectSummary();
@@ -534,6 +542,31 @@
             projSelect.innerHTML += `<option value="${p}">${p}</option>`;
             filterProjSelect.innerHTML += `<option value="${p}">${p}</option>`;
         });
+    }
+
+    // จัดการระบบตัวเลือกหุ้น (Stock Select)
+    function populateStockDropdown() {
+        const select = document.getElementById('stock-select');
+        select.innerHTML = '<option value="">-- เลือกชื่อหุ้น --</option>';
+        
+        // ดึงชื่อหุ้นที่มีทั้งหมดมาใส่ใน Dropdown
+        appData.stockSymbols.forEach(sym => {
+            select.innerHTML += `<option value="${sym}">${sym}</option>`;
+        });
+
+        select.innerHTML += '<option value="__NEW__">➕ เพิ่มหุ้นตัวใหม่...</option>';
+    }
+
+    function toggleNewStockInput() {
+        const selectValue = document.getElementById('stock-select').value;
+        const container = document.getElementById('new-stock-container');
+        if (selectValue === '__NEW__') {
+            container.style.display = 'block';
+            document.getElementById('stock-symbol-new').setAttribute('required', 'required');
+        } else {
+            container.style.display = 'none';
+            document.getElementById('stock-symbol-new').removeAttribute('required');
+        }
     }
 
     function renderDashboard() {
@@ -642,20 +675,44 @@
 
     function handleSaveStock(e) {
         e.preventDefault();
+        let selectedSymbol = document.getElementById('stock-select').value;
+        
+        if (!selectedSymbol) {
+            alert('⚠️ กรุณาเลือกชื่อหุ้น');
+            return;
+        }
+
+        if (selectedSymbol === '__NEW__') {
+            selectedSymbol = document.getElementById('stock-symbol-new').value.toUpperCase().trim();
+            if (!selectedSymbol) {
+                alert('⚠️ กรุณาระบุชื่อหุ้นใหม่');
+                return;
+            }
+            // เพิ่มชื่อหุ้นใหม่เข้าหมวดหมู่สะสม
+            if (!appData.stockSymbols.includes(selectedSymbol)) {
+                appData.stockSymbols.push(selectedSymbol);
+            }
+        }
+
         const newStock = {
             id: Date.now(),
             date: document.getElementById('stock-date').value,
-            symbol: document.getElementById('stock-symbol').value.toUpperCase().trim(),
+            symbol: selectedSymbol,
             action: document.getElementById('stock-action').value,
-            shares: parseInt(document.getElementById('stock-shares').value),
+            shares: parseFloat(document.getElementById('stock-shares').value),
             price: parseFloat(document.getElementById('stock-price').value)
         };
+
         appData.stocks.push(newStock);
         saveUserData();
         alert('✅ บันทึกการออมหุ้นเรียบร้อย');
-        document.getElementById('stock-symbol').value = '';
+
         document.getElementById('stock-shares').value = '';
         document.getElementById('stock-price').value = '';
+        document.getElementById('stock-symbol-new').value = '';
+        document.getElementById('new-stock-container').style.display = 'none';
+
+        populateStockDropdown();
         renderStockPage();
     }
 
@@ -683,9 +740,9 @@
                     <td>${s.date}</td>
                     <td><strong>${s.symbol}</strong></td>
                     <td><span class="badge ${s.action === 'buy' ? 'badge-inc' : 'badge-exp'}">${s.action === 'buy' ? 'ซื้อ' : 'ขาย'}</span></td>
-                    <td class="text-right">${s.shares.toLocaleString()}</td>
+                    <td class="text-right">${s.shares.toString()}</td>
                     <td class="text-right">฿${s.price.toFixed(2)}</td>
-                    <td class="text-right">฿${total.toLocaleString()}</td>
+                    <td class="text-right">฿${total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                     <td class="text-right"><button class="btn btn-danger" style="padding:2px 6px; font-size:0.75rem;" onclick="handleDeleteStock(${s.id})">ลบ</button></td>
                 </tr>
             `;
@@ -709,8 +766,8 @@
                 portfolioBody.innerHTML += `
                     <tr>
                         <td><strong>${symbol}</strong></td>
-                        <td class="text-right">${p.shares.toLocaleString()}</td>
-                        <td class="text-right">฿${p.cost.toLocaleString()}</td>
+                        <td class="text-right">${p.shares.toString()}</td>
+                        <td class="text-right">฿${p.cost.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                         <td class="text-right">฿${avg.toFixed(2)}</td>
                     </tr>
                 `;
@@ -718,7 +775,7 @@
             }
         }
 
-        document.getElementById('total-stock-investment').innerText = '฿' + grandTotalInvestment.toLocaleString();
+        document.getElementById('total-stock-investment').innerText = '฿' + grandTotalInvestment.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
 
         if (Object.keys(stockChartData).length === 0) {
             portfolioBody.innerHTML = '<tr><td colspan="4" style="text-align:center;">ยังไม่มีหุ้นในพอร์ต</td></tr>';
