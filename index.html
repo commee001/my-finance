@@ -4,19 +4,36 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ระบบจัดการเงินส่วนตัว & ออมหุ้น</title>
+    <!-- โหลด Chart.js สำหรับวาดกราฟวงกลม -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: 'Sarabun', sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; display: flex; justify-content: center; }
-        .app-container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
-        h2 { text-align: center; color: #333; margin-bottom: 20px; }
+        .app-container { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 420px; }
+        h2 { text-align: center; color: #333; margin-bottom: 15px; }
         label { font-weight: bold; margin-top: 10px; display: block; font-size: 14px; color: #555;}
-        input, select, button { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
+        input, select, button { width: 100%; padding: 12px; margin: 6px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
         
-        .btn-menu { background-color: #4b6584; color: white; border: none; cursor: pointer; font-weight: bold; margin-bottom: 12px; }
-        .btn-menu:hover { background-color: #384e68; }
-        .btn-submit { background-color: #20bf6b; color: white; border: none; cursor: pointer; font-weight: bold; margin-top: 15px;}
-        .btn-submit:hover { background-color: #1aa059; }
+        .btn-menu { background-color: #4b6584; color: white; border: none; cursor: pointer; font-weight: bold; margin-bottom: 10px; }
+        .btn-submit { background-color: #20bf6b; color: white; border: none; cursor: pointer; font-weight: bold; margin-top: 10px;}
         .btn-back { background-color: #fc5c65; color: white; border: none; cursor: pointer; margin-top: 10px; }
         
+        .summary-box { background: #f8f9fa; border: 1px solid #e9ecef; padding: 15px; border-radius: 8px; margin-top: 15px; }
+        .summary-box h3 { margin: 0 0 10px 0; font-size: 16px; color: #2d3436; text-align: center; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+        .stat-row { display: flex; justify-content: space-between; margin: 6px 0; font-size: 14px; }
+        .val-green { color: #20bf6b; font-weight: bold; }
+        .val-red { color: #eb3b5a; font-weight: bold; }
+        .val-blue { color: #3867d6; font-weight: bold; }
+        
+        /* สไตล์กล่องข้อความสรุป */
+        .text-summary-list { font-size: 13px; color: #444; background: #ffffff; padding: 10px; border-radius: 6px; border: 1px solid #eee; margin-top: 10px; }
+        .text-summary-list div { margin-bottom: 4px; display: flex; justify-content: space-between; }
+
+        .chart-container { position: relative; width: 100%; max-width: 260px; margin: 15px auto 0 auto; text-align: center; }
+
+        .stock-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+        .stock-table th, .stock-table td { border: 1px solid #dee2e6; padding: 6px; text-align: center; }
+        .stock-table th { background-color: #e9ecef; }
+
         .page { display: none; }
         .page.active { display: block; }
         .loading { display: none; text-align: center; color: #e67e22; font-weight: bold; margin-top: 10px; }
@@ -54,7 +71,28 @@
         <input type="text" id="transNote" placeholder="รายละเอียดเพิ่มเติม">
 
         <button class="btn-submit" id="btnTransSubmit" onclick="submitTransaction()">บันทึกข้อมูล</button>
-        <div id="transLoading" class="loading">⏳ กำลังบันทึกลง Google Sheets...</div>
+        <div id="transLoading" class="loading">⏳ กำลังบันทึกข้อมูล...</div>
+
+        <!-- กล่องสรุปผล รายรับ-รายจ่าย -->
+        <div class="summary-box">
+            <h3>📊 สรุปภาพรวมทางการเงิน</h3>
+            <div class="stat-row"><span>รายรับรวม:</span> <span id="sumIncome" class="val-green">฿0</span></div>
+            <div class="stat-row"><span>รายจ่ายรวม:</span> <span id="sumExpense" class="val-red">฿0</span></div>
+            <div class="stat-row" style="border-top: 1px dashed #ccc; padding-top: 5px; margin-top: 5px;">
+                <span><strong>เงินคงเหลือ:</strong></span> <span id="sumBalance" class="val-blue">฿0</span>
+            </div>
+
+            <!-- ข้อความสรุปแยกตามหมวดหมู่ -->
+            <div style="margin-top: 12px; font-weight: bold; font-size: 14px;">🏷️ สรุปยอดแยกตามหมวดหมู่:</div>
+            <div id="transTextSummary" class="text-summary-list">ยังไม่มีรายการบันทึก</div>
+
+            <!-- กราฟวงกลมแสดงสัดส่วนรายจ่าย -->
+            <div class="chart-container">
+                <div style="font-size:13px; font-weight:bold; margin-bottom:5px; color:#555;">🍕 กราฟสัดส่วนรายจ่าย</div>
+                <canvas id="expensePieChart"></canvas>
+            </div>
+        </div>
+
         <button class="btn-back" onclick="goToPage('mainMenu')">กลับหน้าหลัก</button>
     </div>
 
@@ -78,21 +116,59 @@
         <input type="number" id="stockPrice" placeholder="เช่น 35.50">
 
         <button class="btn-submit" id="btnStockSubmit" onclick="submitStock()">บันทึกข้อมูล</button>
-        <div id="stockLoading" class="loading">⏳ กำลังบันทึกลง Google Sheets...</div>
+        <div id="stockLoading" class="loading">⏳ กำลังบันทึกข้อมูล...</div>
+
+        <!-- กล่องสรุปพอร์ตหุ้น -->
+        <div class="summary-box">
+            <h3>💼 สรุปพอร์ตการออมหุ้น</h3>
+            <table class="stock-table">
+                <thead>
+                    <tr>
+                        <th>หุ้น</th>
+                        <th>จำนวน</th>
+                        <th>ลงทุนรวม</th>
+                        <th>เฉลี่ย/หุ้น</th>
+                    </tr>
+                </thead>
+                <tbody id="stockTableBody">
+                    <tr><td colspan="4">กำลังโหลดข้อมูล...</td></tr>
+                </tbody>
+            </table>
+
+            <!-- ข้อความสรุปสัดส่วนการลงทุนหุ้น -->
+            <div style="margin-top: 12px; font-weight: bold; font-size: 14px;">📜 สรุปยอดเงินลงทุนรายตัว:</div>
+            <div id="stockTextSummary" class="text-summary-list">กำลังโหลดข้อมูล...</div>
+
+            <!-- กราฟวงกลมแสดงสัดส่วนพอร์ตหุ้น -->
+            <div class="chart-container">
+                <div style="font-size:13px; font-weight:bold; margin-bottom:5px; color:#555;">🍕 กราฟสัดส่วนพอร์ตหุ้น</div>
+                <canvas id="stockPieChart"></canvas>
+            </div>
+        </div>
+
         <button class="btn-back" onclick="goToPage('mainMenu')">กลับหน้าหลัก</button>
     </div>
 
 </div>
 
 <script>
-    // เสียบ URL ของ Google Apps Script API ของคุณเรียบร้อยแล้ว
     const GAS_URL = "https://script.google.com/macros/s/AKfycbzsPFKG--mawDfQUd5gSqA6jzMbGu5JjLDBd4cZYh-DlEwvJeb1TaamB-69GOvKOp5ZrQ/exec";
 
+    let localTransactions = [];
+    let myExpenseChart = null; // กราฟวงกลมรายจ่าย
+    let myStockChart = null;   // กราฟวงกลมหุ้น
+
+    const chartColors = ['#ff6384', '#36a2eb', '#ffce56', '#4bc0c0', '#9966ff', '#ff9f40', '#e74c3c', '#2ecc71'];
+
+    window.onload = function() {
+        loadSummaryData();
+    };
 
     function goToPage(pageId) {
         document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
         document.getElementById(pageId).classList.add('active');
         if(pageId === 'transactionPage') updateCategory();
+        loadSummaryData();
     }
 
     function updateCategory() {
@@ -124,90 +200,174 @@
         }
     }
 
-    // ยิงข้อมูล รายรับ-รายจ่าย ไปยัง Google Sheets
+    // โหลดข้อมูลสรุปจาก Google Sheets มาแสดง
+    function loadSummaryData() {
+        fetch(GAS_URL)
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('sumIncome').innerText = '฿' + Number(data.income).toLocaleString();
+            document.getElementById('sumExpense').innerText = '฿' + Number(data.expense).toLocaleString();
+            document.getElementById('sumBalance').innerText = '฿' + Number(data.balance).toLocaleString();
+
+            const tbody = document.getElementById('stockTableBody');
+            const stockTextDiv = document.getElementById('stockTextSummary');
+            tbody.innerHTML = '';
+            stockTextDiv.innerHTML = '';
+
+            if (!data.stocks || data.stocks.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4">ยังไม่มีข้อมูลหุ้น</td></tr>';
+                stockTextDiv.innerHTML = 'ยังไม่มีข้อมูลหุ้นในพอร์ต';
+            } else {
+                let stockNames = [];
+                let stockCosts = [];
+
+                data.stocks.forEach(st => {
+                    let tr = `<tr>
+                        <td><strong>${st.symbol}</strong></td>
+                        <td>${Number(st.totalShares).toLocaleString()}</td>
+                        <td>฿${Number(st.totalCost).toLocaleString()}</td>
+                        <td>฿${Number(st.avgPrice).toFixed(2)}</td>
+                    </tr>`;
+                    tbody.innerHTML += tr;
+
+                    stockTextDiv.innerHTML += `<div><span>• ${st.symbol} (${Number(st.totalShares).toLocaleString()} หุ้น):</span> <strong>฿${Number(st.totalCost).toLocaleString()}</strong></div>`;
+
+                    stockNames.push(st.symbol);
+                    stockCosts.push(st.totalCost);
+                });
+
+                // วาดกราฟวงกลมพอร์ตหุ้น
+                renderStockChart(stockNames, stockCosts);
+            }
+        })
+        .catch(err => console.log("กำลังรอโหลดข้อมูล..."));
+    }
+
     function submitTransaction() {
         const type = document.getElementById('transType').value;
         let category = document.getElementById('transCategory').value;
-        if(category === 'อื่นๆ (เพิ่มเอง)') {
-            category = document.getElementById('customCategory').value;
-        }
-        const amount = document.getElementById('transAmount').value;
+        if(category === 'อื่นๆ (เพิ่มเอง)') category = document.getElementById('customCategory').value;
+        const amount = parseFloat(document.getElementById('transAmount').value);
         const note = document.getElementById('transNote').value;
 
-        if(!amount || !category) {
-            alert('กรุณากรอกข้อมูลให้ครบถ้วน');
-            return;
-        }
+        if(!amount || !category) { alert('กรุณากรอกข้อมูลให้ครบถ้วน'); return; }
 
-        const payload = {
-            action: "transaction",
-            type: type,
-            category: category,
-            amount: amount,
-            note: note
-        };
+        localTransactions.push({ type: type, category: category, amount: amount });
 
+        const payload = { action: "transaction", type: type, category: category, amount: amount, note: note };
+        
         sendData(payload, 'btnTransSubmit', 'transLoading', function() {
+            // อัปเดตข้อความสรุป และ กราฟวงกลมรายจ่าย
+            updateTransSummaryUI();
+
             document.getElementById('transAmount').value = '';
             document.getElementById('transNote').value = '';
+            alert('✅ บันทึกรายการเรียบร้อยแล้ว!');
         });
     }
 
-    // ยิงข้อมูล หุ้น ไปยัง Google Sheets
+    // อัปเดตข้อความสรุปและกราฟวงกลมของฝั่ง รายรับ-รายจ่าย
+    function updateTransSummaryUI() {
+        let catSummary = {};
+        let expCategories = {};
+
+        localTransactions.forEach(item => {
+            if (!catSummary[item.category]) catSummary[item.category] = 0;
+            catSummary[item.category] += item.amount;
+
+            if (item.type === 'รายจ่าย') {
+                if (!expCategories[item.category]) expCategories[item.category] = 0;
+                expCategories[item.category] += item.amount;
+            }
+        });
+
+        // 1. อัปเดตข้อความสรุป
+        const textDiv = document.getElementById('transTextSummary');
+        textDiv.innerHTML = '';
+        for (let cat in catSummary) {
+            textDiv.innerHTML += `<div><span>• ${cat}:</span> <strong>฿${catSummary[cat].toLocaleString()}</strong></div>`;
+        }
+
+        // 2. อัปเดตกราฟวงกลม
+        const labels = Object.keys(expCategories);
+        const values = Object.values(expCategories);
+        if (labels.length > 0) {
+            renderExpenseChart(labels, values);
+        }
+    }
+
+    // วาดกราฟวงกลม รายจ่าย
+    function renderExpenseChart(labels, dataValues) {
+        const ctx = document.getElementById('expensePieChart').getContext('2d');
+        if (myExpenseChart) myExpenseChart.destroy();
+
+        myExpenseChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: labels,
+                datasets: [{ data: dataValues, backgroundColor: chartColors.slice(0, labels.length) }]
+            },
+            options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+        });
+    }
+
+    // วาดกราฟวงกลม พอร์ตหุ้น
+    function renderStockChart(labels, dataValues) {
+        const ctx = document.getElementById('stockPieChart').getContext('2d');
+        if (myStockChart) myStockChart.destroy();
+
+        myStockChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: labels,
+                datasets: [{ data: dataValues, backgroundColor: chartColors.slice(0, labels.length) }]
+            },
+            options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+        });
+    }
+
     function submitStock() {
         const name = document.getElementById('stockName').value.toUpperCase();
         const action = document.getElementById('stockAction').value;
         const shares = document.getElementById('stockShares').value;
         const price = document.getElementById('stockPrice').value;
 
-        if(!name || !shares || !price) {
-            alert('กรุณากรอกข้อมูลหุ้นให้ครบถ้วน');
-            return;
-        }
+        if(!name || !shares || !price) { alert('กรุณากรอกข้อมูลหุ้นให้ครบถ้วน'); return; }
 
-        const payload = {
-            action: "stock",
-            name: name,
-            stockAction: action,
-            shares: shares,
-            price: price
-        };
-
+        const payload = { action: "stock", name: name, stockAction: action, shares: shares, price: price };
         sendData(payload, 'btnStockSubmit', 'stockLoading', function() {
+            const total = (parseFloat(shares) * parseFloat(price)).toLocaleString();
+            alert(`✅ บันทึกการออมหุ้นสำเร็จ!\n\n📈 หุ้น: ${name}\n📝 รายการ: ${action === 'buy' ? 'ซื้อ' : 'ขาย'}\n🔢 จำนวน: ${shares} หุ้น\n💵 ยอดรวม: ฿${total}`);
+            
             document.getElementById('stockName').value = '';
             document.getElementById('stockShares').value = '';
             document.getElementById('stockPrice').value = '';
         });
     }
 
-    // ฟังก์ชันยิง API กลาง
-    function sendData(payload, btnId, loadingId, resetFormCallback) {
+    function sendData(payload, btnId, loadingId, onSuccessCallback) {
         const btn = document.getElementById(btnId);
         const loading = document.getElementById(loadingId);
 
         btn.disabled = true;
         loading.style.display = 'block';
 
-        fetch(GAS_URL, {
-            method: "POST",
-            body: JSON.stringify(payload)
+        fetch(GAS_URL, { 
+            method: "POST", 
+            mode: "no-cors",
+            headers: { "Content-Type": "text/plain" },
+            body: JSON.stringify(payload) 
         })
-        .then(res => res.json())
-        .then(data => {
+        .then(() => {
             btn.disabled = false;
             loading.style.display = 'none';
-
-            if(data.status === 'success') {
-                alert('✅ ' + data.message);
-                resetFormCallback();
-            } else {
-                alert('❌ เกิดข้อผิดพลาด: ' + data.message);
-            }
+            onSuccessCallback();
+            setTimeout(loadSummaryData, 1500);
         })
         .catch(err => {
             btn.disabled = false;
             loading.style.display = 'none';
-            alert('❌ ไม่สามารถติดต่อเซิร์ฟเวอร์ได้: ' + err);
+            alert('❌ เกิดข้อผิดพลาด: ' + err);
         });
     }
 </script>
