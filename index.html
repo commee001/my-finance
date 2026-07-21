@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบจัดการเงินส่วนตัว & ออมหุ้น</title>
+    <style>
+        body { font-family: 'Sarabun', sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .app-container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
+        h2 { text-align: center; color: #333; margin-bottom: 20px; }
+        label { font-weight: bold; margin-top: 10px; display: block; font-size: 14px; color: #555;}
+        input, select, button { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
+        
+        .btn-menu { background-color: #4b6584; color: white; border: none; cursor: pointer; font-weight: bold; margin-bottom: 12px; }
+        .btn-menu:hover { background-color: #384e68; }
+        .btn-submit { background-color: #20bf6b; color: white; border: none; cursor: pointer; font-weight: bold; margin-top: 15px;}
+        .btn-submit:hover { background-color: #1aa059; }
+        .btn-back { background-color: #fc5c65; color: white; border: none; cursor: pointer; margin-top: 10px; }
+        
+        .page { display: none; }
+        .page.active { display: block; }
+        .loading { display: none; text-align: center; color: #e67e22; font-weight: bold; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+
+    <!-- หน้า 1: เมนูหลัก -->
+    <div id="mainMenu" class="page active">
+        <h2>💰 ระบบจัดการเงิน & หุ้น</h2>
+        <button class="btn-menu" onclick="goToPage('transactionPage')">📝 บันทึกรายรับ - รายจ่าย</button>
+        <button class="btn-menu" onclick="goToPage('stockPage')">📈 บันทึกการออมหุ้น</button>
+    </div>
+
+    <!-- หน้า 2: บันทึกรายรับ-รายจ่าย -->
+    <div id="transactionPage" class="page">
+        <h2>📝 บันทึกรายรับ-รายจ่าย</h2>
+        
+        <label>ประเภทรายการ</label>
+        <select id="transType" onchange="updateCategory()">
+            <option value="รายจ่าย">รายจ่าย</option>
+            <option value="รายรับ">รายรับ</option>
+        </select>
+
+        <label>หมวดหมู่</label>
+        <select id="transCategory" onchange="checkCustomCategory()"></select>
+        <input type="text" id="customCategory" placeholder="พิมพ์หมวดหมู่ใหม่..." style="display: none;">
+
+        <label>จำนวนเงิน (บาท)</label>
+        <input type="number" id="transAmount" placeholder="เช่น 150">
+
+        <label>หมายเหตุ (ไม่บังคับ)</label>
+        <input type="text" id="transNote" placeholder="รายละเอียดเพิ่มเติม">
+
+        <button class="btn-submit" id="btnTransSubmit" onclick="submitTransaction()">บันทึกข้อมูล</button>
+        <div id="transLoading" class="loading">⏳ กำลังบันทึกลง Google Sheets...</div>
+        <button class="btn-back" onclick="goToPage('mainMenu')">กลับหน้าหลัก</button>
+    </div>
+
+    <!-- หน้า 3: บันทึกการออมหุ้น -->
+    <div id="stockPage" class="page">
+        <h2>📈 บันทึกการออมหุ้น</h2>
+        
+        <label>ชื่อหุ้น</label>
+        <input type="text" id="stockName" placeholder="เช่น PTT, AOT">
+
+        <label>รายการ</label>
+        <select id="stockAction">
+            <option value="buy">ซื้อ (Buy)</option>
+            <option value="sell">ขาย (Sell)</option>
+        </select>
+
+        <label>จำนวนหุ้น</label>
+        <input type="number" id="stockShares" placeholder="จำนวนหน่วย">
+
+        <label>ราคาต่อหุ้น (บาท)</label>
+        <input type="number" id="stockPrice" placeholder="เช่น 35.50">
+
+        <button class="btn-submit" id="btnStockSubmit" onclick="submitStock()">บันทึกข้อมูล</button>
+        <div id="stockLoading" class="loading">⏳ กำลังบันทึกลง Google Sheets...</div>
+        <button class="btn-back" onclick="goToPage('mainMenu')">กลับหน้าหลัก</button>
+    </div>
+
+</div>
+
+<script>
+    // เสียบ URL ของ Google Apps Script API ของคุณเรียบร้อยแล้ว
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbzntzhbRrVLE78HoyUyezIy5BPqzLaq3Co_tvV2cj3ZFju4Jdntk44b1-ozI7eiyBFZmA/exec";
+
+    function goToPage(pageId) {
+        document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+        document.getElementById(pageId).classList.add('active');
+        if(pageId === 'transactionPage') updateCategory();
+    }
+
+    function updateCategory() {
+        const type = document.getElementById('transType').value;
+        const categorySelect = document.getElementById('transCategory');
+        categorySelect.innerHTML = '';
+
+        let options = (type === 'รายจ่าย') 
+            ? ['ของกิน', 'ของใช้', 'ฟุ่มเฟือย', 'อื่นๆ (เพิ่มเอง)'] 
+            : ['เงินเดือน', 'แม่ให้', 'อื่นๆ (เพิ่มเอง)'];
+
+        options.forEach(opt => {
+            let newOption = document.createElement('option');
+            newOption.value = opt;
+            newOption.innerText = opt;
+            categorySelect.appendChild(newOption);
+        });
+        checkCustomCategory();
+    }
+
+    function checkCustomCategory() {
+        const categorySelect = document.getElementById('transCategory').value;
+        const customInput = document.getElementById('customCategory');
+        if (categorySelect === 'อื่นๆ (เพิ่มเอง)') {
+            customInput.style.display = 'block';
+        } else {
+            customInput.style.display = 'none';
+            customInput.value = '';
+        }
+    }
+
+    // ยิงข้อมูล รายรับ-รายจ่าย ไปยัง Google Sheets
+    function submitTransaction() {
+        const type = document.getElementById('transType').value;
+        let category = document.getElementById('transCategory').value;
+        if(category === 'อื่นๆ (เพิ่มเอง)') {
+            category = document.getElementById('customCategory').value;
+        }
+        const amount = document.getElementById('transAmount').value;
+        const note = document.getElementById('transNote').value;
+
+        if(!amount || !category) {
+            alert('กรุณากรอกข้อมูลให้ครบถ้วน');
+            return;
+        }
+
+        const payload = {
+            action: "transaction",
+            type: type,
+            category: category,
+            amount: amount,
+            note: note
+        };
+
+        sendData(payload, 'btnTransSubmit', 'transLoading', function() {
+            document.getElementById('transAmount').value = '';
+            document.getElementById('transNote').value = '';
+        });
+    }
+
+    // ยิงข้อมูล หุ้น ไปยัง Google Sheets
+    function submitStock() {
+        const name = document.getElementById('stockName').value.toUpperCase();
+        const action = document.getElementById('stockAction').value;
+        const shares = document.getElementById('stockShares').value;
+        const price = document.getElementById('stockPrice').value;
+
+        if(!name || !shares || !price) {
+            alert('กรุณากรอกข้อมูลหุ้นให้ครบถ้วน');
+            return;
+        }
+
+        const payload = {
+            action: "stock",
+            name: name,
+            stockAction: action,
+            shares: shares,
+            price: price
+        };
+
+        sendData(payload, 'btnStockSubmit', 'stockLoading', function() {
+            document.getElementById('stockName').value = '';
+            document.getElementById('stockShares').value = '';
+            document.getElementById('stockPrice').value = '';
+        });
+    }
+
+    // ฟังก์ชันยิง API กลาง
+    function sendData(payload, btnId, loadingId, resetFormCallback) {
+        const btn = document.getElementById(btnId);
+        const loading = document.getElementById(loadingId);
+
+        btn.disabled = true;
+        loading.style.display = 'block';
+
+        fetch(GAS_URL, {
+            method: "POST",
+            body: JSON.stringify(payload)
+        })
+        .then(res => res.json())
+        .then(data => {
+            btn.disabled = false;
+            loading.style.display = 'none';
+
+            if(data.status === 'success') {
+                alert('✅ ' + data.message);
+                resetFormCallback();
+            } else {
+                alert('❌ เกิดข้อผิดพลาด: ' + data.message);
+            }
+        })
+        .catch(err => {
+            btn.disabled = false;
+            loading.style.display = 'none';
+            alert('❌ ไม่สามารถติดต่อเซิร์ฟเวอร์ได้: ' + err);
+        });
+    }
+</script>
+
+</body>
+</html>
