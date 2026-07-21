@@ -3,371 +3,518 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบจัดการเงินส่วนตัว & ออมหุ้น</title>
-    <!-- โหลด Chart.js สำหรับวาดกราฟวงกลม -->
+    <title>ระบบจัดการรายรับ-รายจ่าย & โปรเจกต์</title>
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: 'Sarabun', sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; display: flex; justify-content: center; }
-        .app-container { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 420px; }
-        h2 { text-align: center; color: #333; margin-bottom: 15px; }
-        label { font-weight: bold; margin-top: 10px; display: block; font-size: 14px; color: #555;}
-        input, select, button { width: 100%; padding: 12px; margin: 6px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
-        
-        .btn-menu { background-color: #4b6584; color: white; border: none; cursor: pointer; font-weight: bold; margin-bottom: 10px; }
-        .btn-submit { background-color: #20bf6b; color: white; border: none; cursor: pointer; font-weight: bold; margin-top: 10px;}
-        .btn-back { background-color: #fc5c65; color: white; border: none; cursor: pointer; margin-top: 10px; }
-        
-        .summary-box { background: #f8f9fa; border: 1px solid #e9ecef; padding: 15px; border-radius: 8px; margin-top: 15px; }
-        .summary-box h3 { margin: 0 0 10px 0; font-size: 16px; color: #2d3436; text-align: center; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
-        .stat-row { display: flex; justify-content: space-between; margin: 6px 0; font-size: 14px; }
-        .val-green { color: #20bf6b; font-weight: bold; }
-        .val-red { color: #eb3b5a; font-weight: bold; }
-        .val-blue { color: #3867d6; font-weight: bold; }
-        
-        /* สไตล์กล่องข้อความสรุป */
-        .text-summary-list { font-size: 13px; color: #444; background: #ffffff; padding: 10px; border-radius: 6px; border: 1px solid #eee; margin-top: 10px; }
-        .text-summary-list div { margin-bottom: 4px; display: flex; justify-content: space-between; }
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --bg: #f3f4f6;
+            --card-bg: #ffffff;
+            --text: #1f2937;
+            --text-muted: #6b7280;
+            --income: #10b981;
+            --expense: #ef4444;
+            --border: #e5e7eb;
+        }
 
-        .chart-container { position: relative; width: 100%; max-width: 260px; margin: 15px auto 0 auto; text-align: center; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Sarabun', -apple-system, BlinkMacSystemFont, sans-serif; }
+        body { background-color: var(--bg); color: var(--text); padding: 15px; }
+        .container { max-width: 1000px; margin: 0 auto; }
 
-        .stock-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
-        .stock-table th, .stock-table td { border: 1px solid #dee2e6; padding: 6px; text-align: center; }
-        .stock-table th { background-color: #e9ecef; }
+        header { background: var(--card-bg); padding: 15px 20px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        h1 { font-size: 1.25rem; color: var(--primary); font-weight: 700; }
+        .nav-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+        .btn { padding: 8px 14px; border-radius: 8px; border: none; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: 0.2s; background: #e0e7ff; color: var(--primary); }
+        .btn.active, .btn:hover { background: var(--primary); color: white; }
+        .btn-danger { background: #fee2e2; color: var(--expense); }
+        .btn-danger:hover { background: var(--expense); color: white; }
 
-        .page { display: none; }
-        .page.active { display: block; }
-        .loading { display: none; text-align: center; color: #e67e22; font-weight: bold; margin-top: 10px; }
+        .card { background: var(--card-bg); padding: 20px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
+
+        .stat-card { background: #f9fafb; padding: 15px; border-radius: 10px; border: 1px solid var(--border); text-align: center; }
+        .stat-card .val { font-size: 1.4rem; font-weight: bold; margin-top: 5px; }
+        .stat-card.inc .val { color: var(--income); }
+        .stat-card.exp .val { color: var(--expense); }
+        .stat-card.bal .val { color: var(--primary); }
+
+        form label { display: block; font-size: 0.85rem; font-weight: 600; margin-top: 10px; color: var(--text-muted); }
+        form input, form select { width: 100%; padding: 10px; margin-top: 4px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; }
+        .form-submit { width: 100%; margin-top: 15px; background: var(--primary); color: white; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .form-submit:hover { background: var(--primary-hover); }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.88rem; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: #f9fafb; color: var(--text-muted); font-weight: 600; }
+        .text-right { text-align: right; }
+        .badge { padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; display: inline-block; }
+        .badge-inc { background: #d1fae5; color: #065f46; }
+        .badge-exp { background: #fee2e2; color: #991b1b; }
+
+        .chart-box { max-width: 320px; margin: 0 auto; }
+        .view-section { display: none; }
+        .view-section.active { display: block; }
     </style>
 </head>
 <body>
 
-<div class="app-container">
+<div class="container">
+    <header>
+        <h1>📊 ระบบจัดการเงิน & โปรเจกต์</h1>
+        <div class="nav-btns">
+            <button class="btn active" onclick="switchView('dashboard')">📈 แดชบอร์ด</button>
+            <button class="btn" onclick="switchView('add')">➕ บันทึกรายการ</button>
+            <button class="btn" onclick="switchView('categories')">🏷️ หมวดหมู่</button>
+            <button class="btn" onclick="switchView('projects')">📁 โปรเจกต์</button>
+        </div>
+    </header>
 
-    <!-- หน้า 1: เมนูหลัก -->
-    <div id="mainMenu" class="page active">
-        <h2>💰 ระบบจัดการเงิน & หุ้น</h2>
-        <button class="btn-menu" onclick="goToPage('transactionPage')">📝 บันทึกรายรับ - รายจ่าย</button>
-        <button class="btn-menu" onclick="goToPage('stockPage')">📈 บันทึกการออมหุ้น</button>
-    </div>
-
-    <!-- หน้า 2: บันทึกรายรับ-รายจ่าย -->
-    <div id="transactionPage" class="page">
-        <h2>📝 บันทึกรายรับ-รายจ่าย</h2>
-        
-        <label>ประเภทรายการ</label>
-        <select id="transType" onchange="updateCategory()">
-            <option value="รายจ่าย">รายจ่าย</option>
-            <option value="รายรับ">รายรับ</option>
-        </select>
-
-        <label>หมวดหมู่</label>
-        <select id="transCategory" onchange="checkCustomCategory()"></select>
-        <input type="text" id="customCategory" placeholder="พิมพ์หมวดหมู่ใหม่..." style="display: none;">
-
-        <label>จำนวนเงิน (บาท)</label>
-        <input type="number" id="transAmount" placeholder="เช่น 150">
-
-        <label>หมายเหตุ (ไม่บังคับ)</label>
-        <input type="text" id="transNote" placeholder="รายละเอียดเพิ่มเติม">
-
-        <button class="btn-submit" id="btnTransSubmit" onclick="submitTransaction()">บันทึกข้อมูล</button>
-        <div id="transLoading" class="loading">⏳ กำลังบันทึกข้อมูล...</div>
-
-        <!-- กล่องสรุปผล รายรับ-รายจ่าย -->
-        <div class="summary-box">
-            <h3>📊 สรุปภาพรวมทางการเงิน</h3>
-            <div class="stat-row"><span>รายรับรวม:</span> <span id="sumIncome" class="val-green">฿0</span></div>
-            <div class="stat-row"><span>รายจ่ายรวม:</span> <span id="sumExpense" class="val-red">฿0</span></div>
-            <div class="stat-row" style="border-top: 1px dashed #ccc; padding-top: 5px; margin-top: 5px;">
-                <span><strong>เงินคงเหลือ:</strong></span> <span id="sumBalance" class="val-blue">฿0</span>
+    <!-- 1. หน้า Dashboard -->
+    <div id="view-dashboard" class="view-section active">
+        <!-- ตัวกรอง -->
+        <div class="card grid-3">
+            <div>
+                <label>เลือกปี</label>
+                <select id="filter-year" onchange="renderDashboard()"></select>
             </div>
-
-            <!-- ข้อความสรุปแยกตามหมวดหมู่ -->
-            <div style="margin-top: 12px; font-weight: bold; font-size: 14px;">🏷️ สรุปยอดแยกตามหมวดหมู่:</div>
-            <div id="transTextSummary" class="text-summary-list">ยังไม่มีรายการบันทึก</div>
-
-            <!-- กราฟวงกลมแสดงสัดส่วนรายจ่าย -->
-            <div class="chart-container">
-                <div style="font-size:13px; font-weight:bold; margin-bottom:5px; color:#555;">🍕 กราฟสัดส่วนรายจ่าย</div>
-                <canvas id="expensePieChart"></canvas>
+            <div>
+                <label>เลือกเดือน</label>
+                <select id="filter-month" onchange="renderDashboard()">
+                    <option value="">-- ทุกเดือน --</option>
+                    <option value="1">มกราคม</option><option value="2">กุมภาพันธ์</option>
+                    <option value="3">มีนาคม</option><option value="4">เมษายน</option>
+                    <option value="5">พฤษภาคม</option><option value="6">มิถุนายน</option>
+                    <option value="7">กรกฎาคม</option><option value="8">สิงหาคม</option>
+                    <option value="9">กันยายน</option><option value="10">ตลุาคม</option>
+                    <option value="11">พฤศจิกายน</option><option value="12">ธันวาคม</option>
+                </select>
+            </div>
+            <div>
+                <label>เลือกโปรเจกต์</label>
+                <select id="filter-project" onchange="renderDashboard()"></select>
             </div>
         </div>
 
-        <button class="btn-back" onclick="goToPage('mainMenu')">กลับหน้าหลัก</button>
-    </div>
+        <!-- การ์ดสรุปยอด -->
+        <div class="grid-3 card">
+            <div class="stat-card inc">
+                <div>รายรับรวม</div>
+                <div class="val" id="sum-inc">฿0</div>
+            </div>
+            <div class="stat-card exp">
+                <div>รายจ่ายรวม</div>
+                <div class="val" id="sum-exp">฿0</div>
+            </div>
+            <div class="stat-card bal">
+                <div>สุทธิ / คงเหลือ</div>
+                <div class="val" id="sum-bal">฿0</div>
+            </div>
+        </div>
 
-    <!-- หน้า 3: บันทึกการออมหุ้น -->
-    <div id="stockPage" class="page">
-        <h2>📈 บันทึกการออมหุ้น</h2>
-        
-        <label>ชื่อหุ้น</label>
-        <input type="text" id="stockName" placeholder="เช่น PTT, AOT">
+        <!-- กราฟวงกลม -->
+        <div class="grid-2">
+            <div class="card">
+                <h3 style="text-align: center; font-size: 0.95rem; margin-bottom: 10px;">🟢 สัดส่วนรายรับตามหมวดหมู่</h3>
+                <div class="chart-box"><canvas id="incPieChart"></canvas></div>
+            </div>
+            <div class="card">
+                <h3 style="text-align: center; font-size: 0.95rem; margin-bottom: 10px;">🔴 สัดส่วนรายจ่ายตามหมวดหมู่</h3>
+                <div class="chart-box"><canvas id="expPieChart"></canvas></div>
+            </div>
+        </div>
 
-        <label>รายการ</label>
-        <select id="stockAction">
-            <option value="buy">ซื้อ (Buy)</option>
-            <option value="sell">ขาย (Sell)</option>
-        </select>
-
-        <label>จำนวนหุ้น</label>
-        <input type="number" id="stockShares" placeholder="จำนวนหน่วย">
-
-        <label>ราคาต่อหุ้น (บาท)</label>
-        <input type="number" id="stockPrice" placeholder="เช่น 35.50">
-
-        <button class="btn-submit" id="btnStockSubmit" onclick="submitStock()">บันทึกข้อมูล</button>
-        <div id="stockLoading" class="loading">⏳ กำลังบันทึกข้อมูล...</div>
-
-        <!-- กล่องสรุปพอร์ตหุ้น -->
-        <div class="summary-box">
-            <h3>💼 สรุปพอร์ตการออมหุ้น</h3>
-            <table class="stock-table">
+        <!-- ตารางประวัติรายการ -->
+        <div class="card" style="overflow-x: auto;">
+            <h3>📝 ประวัติรายการล่าสุด</h3>
+            <table>
                 <thead>
                     <tr>
-                        <th>หุ้น</th>
-                        <th>จำนวน</th>
-                        <th>ลงทุนรวม</th>
-                        <th>เฉลี่ย/หุ้น</th>
+                        <th>วันที่</th>
+                        <th>ประเภท</th>
+                        <th>รายการ</th>
+                        <th>หมวดหมู่</th>
+                        <th>โปรเจกต์</th>
+                        <th class="text-right">จำนวนเงิน</th>
+                        <th></th>
                     </tr>
                 </thead>
-                <tbody id="stockTableBody">
-                    <tr><td colspan="4">กำลังโหลดข้อมูล...</td></tr>
-                </tbody>
+                <tbody id="tx-table-body"></tbody>
             </table>
-
-            <!-- ข้อความสรุปสัดส่วนการลงทุนหุ้น -->
-            <div style="margin-top: 12px; font-weight: bold; font-size: 14px;">📜 สรุปยอดเงินลงทุนรายตัว:</div>
-            <div id="stockTextSummary" class="text-summary-list">กำลังโหลดข้อมูล...</div>
-
-            <!-- กราฟวงกลมแสดงสัดส่วนพอร์ตหุ้น -->
-            <div class="chart-container">
-                <div style="font-size:13px; font-weight:bold; margin-bottom:5px; color:#555;">🍕 กราฟสัดส่วนพอร์ตหุ้น</div>
-                <canvas id="stockPieChart"></canvas>
-            </div>
         </div>
-
-        <button class="btn-back" onclick="goToPage('mainMenu')">กลับหน้าหลัก</button>
     </div>
 
+    <!-- 2. หน้าบันทึกรายการ -->
+    <div id="view-add" class="view-section">
+        <div class="card" style="max-width: 500px; margin: 0 auto;">
+            <h2>➕ บันทึกรายการใหม่</h2>
+            <form id="tx-form" onsubmit="handleSaveTx(event)">
+                <label>วันที่</label>
+                <input type="date" id="tx-date" required>
+
+                <label>ประเภท</label>
+                <select id="tx-type" onchange="populateCategoryDropdown()">
+                    <option value="รายจ่าย">รายจ่าย</option>
+                    <option value="รายรับ">รายรับ</option>
+                </select>
+
+                <label>หมวดหมู่</label>
+                <select id="tx-category" required></select>
+
+                <label>รายการ / รายละเอียด</label>
+                <input type="text" id="tx-item" placeholder="เช่น ค่าอาหาร, เงินเดือน" required>
+
+                <label>จำนวนเงิน (บาท)</label>
+                <input type="number" step="0.01" id="tx-amount" placeholder="0.00" required>
+
+                <label>โปรเจกต์ (ถ้ามี)</label>
+                <select id="tx-project"></select>
+
+                <button type="submit" class="form-submit">💾 บันทึกข้อมูล</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 3. หน้าจัดการหมวดหมู่ -->
+    <div id="view-categories" class="view-section">
+        <div class="grid-2">
+            <div class="card">
+                <h2>➕ เพิ่มหมวดหมู่ใหม่</h2>
+                <form onsubmit="handleAddCategory(event)">
+                    <label>ชื่อหมวดหมู่</label>
+                    <input type="text" id="cat-name" placeholder="เช่น ค่าเดินทาง, ปันผล" required>
+
+                    <label>ประเภท</label>
+                    <select id="cat-type">
+                        <option value="รายจ่าย">รายจ่าย</option>
+                        <option value="รายรับ">รายรับ</option>
+                    </select>
+
+                    <button type="submit" class="form-submit">เพิ่มหมวดหมู่</button>
+                </form>
+            </div>
+            <div class="card" style="max-height: 400px; overflow-y: auto;">
+                <h2>🏷️ รายการหมวดหมู่ทั้งหมด</h2>
+                <table>
+                    <thead>
+                        <tr><th>หมวดหมู่</th><th>ประเภท</th><th>จัดการ</th></tr>
+                    </thead>
+                    <tbody id="cat-table-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. หน้าจัดการโปรเจกต์ -->
+    <div id="view-projects" class="view-section">
+        <div class="grid-2">
+            <div class="card">
+                <h2>📁 เพิ่มโปรเจกต์ใหม่</h2>
+                <form onsubmit="handleAddProject(event)">
+                    <label>ชื่อโปรเจกต์</label>
+                    <input type="text" id="proj-name" placeholder="เช่น งานพี่เอ, โปรเจกต์ C" required>
+                    <button type="submit" class="form-submit">เพิ่มโปรเจกต์</button>
+                </form>
+            </div>
+            <div class="card">
+                <h2>📂 สรุปกำไร/ขาดทุน รายโปรเจกต์</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ชื่อโปรเจกต์</th>
+                            <th class="text-right">รายรับ</th>
+                            <th class="text-right">รายจ่าย</th>
+                            <th class="text-right">กำไร/ขาดทุน</th>
+                        </tr>
+                    </thead>
+                    <tbody id="proj-summary-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbzsPFKG--mawDfQUd5gSqA6jzMbGu5JjLDBd4cZYh-DlEwvJeb1TaamB-69GOvKOp5ZrQ/exec";
-
-    let localTransactions = [];
-    let myExpenseChart = null; // กราฟวงกลมรายจ่าย
-    let myStockChart = null;   // กราฟวงกลมหุ้น
-
-    const chartColors = ['#ff6384', '#36a2eb', '#ffce56', '#4bc0c0', '#9966ff', '#ff9f40', '#e74c3c', '#2ecc71'];
-
-    window.onload = function() {
-        loadSummaryData();
+    // LocalStorage Data Structure
+    let db = {
+        transactions: JSON.parse(localStorage.getItem('my_txs')) || [
+            { id: 1, date: '2025-06-15', type: 'รายรับ', item: 'มัดจำงาน', category: 'มัดจำงาน', amount: 3800, project: 'งานพี่เอ' },
+            { id: 2, date: '2025-06-15', type: 'รายจ่าย', item: 'ซื้อเสื้อ', category: 'วัตถุดิบ', amount: 1500, project: 'งานพี่เอ' },
+            { id: 3, date: '2025-06-16', type: 'รายจ่าย', item: 'ค่าขนส่ง', category: 'ค่าขนส่ง', amount: 500, project: 'งานพี่เอ' },
+            { id: 4, date: '2025-06-17', type: 'รายจ่าย', item: 'ค่าเดินทาง', category: 'ค่าเดินทาง', amount: 250, project: 'งานพี่เอ' },
+            { id: 5, date: '2025-06-20', type: 'รายรับ', item: 'เงิน Youtube', category: 'เงินจาก Youtube', amount: 4000, project: '' },
+            { id: 6, date: '2025-06-20', type: 'รายรับ', item: 'ดอกเบี้ย', category: 'ดอกเบี้ย', amount: 200, project: '' },
+            { id: 7, date: '2025-06-26', type: 'รายจ่าย', item: 'อาหาร', category: 'ค่าอาหาร', amount: 4000, project: '' }
+        ],
+        categories: JSON.parse(localStorage.getItem('my_cats')) || [
+            { name: 'เงินเดือนหลัก', type: 'รายรับ' },
+            { name: 'เงินโบนัส', type: 'รายรับ' },
+            { name: 'ดอกเบี้ย', type: 'รายรับ' },
+            { name: 'เงินปันผล', type: 'รายรับ' },
+            { name: 'เงินจาก Youtube', type: 'รายรับ' },
+            { name: 'Affiliate', type: 'รายรับ' },
+            { name: 'มัดจำงาน', type: 'รายรับ' },
+            { name: 'ค่าอาหาร', type: 'รายจ่าย' },
+            { name: 'สุขภาพ', type: 'รายจ่าย' },
+            { name: 'ค่าเช่า', type: 'รายจ่าย' },
+            { name: 'บันเทิง', type: 'รายจ่าย' },
+            { name: 'ทำบุญ', type: 'รายจ่าย' },
+            { name: 'เกี่ยวกับลูก', type: 'รายจ่าย' },
+            { name: 'เกี่ยวกับครอบครัว', type: 'รายจ่าย' },
+            { name: 'ท่องเที่ยว', type: 'รายจ่าย' },
+            { name: 'ค่าน้ำ ค่าไฟ', type: 'รายจ่าย' },
+            { name: 'ค่าโทรศัพท์', type: 'รายจ่าย' },
+            { name: 'วัตถุดิบ', type: 'รายจ่าย' },
+            { name: 'ค่าขนส่ง', type: 'รายจ่าย' },
+            { name: 'ค่าเดินทาง', type: 'รายจ่าย' }
+        ],
+        projects: JSON.parse(localStorage.getItem('my_projs')) || ['โปรเจกต์ A', 'โปรเจกต์ B', 'โปรเจกต์ C', 'งานพี่เอ']
     };
 
-    function goToPage(pageId) {
-        document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
-        document.getElementById(pageId).classList.add('active');
-        if(pageId === 'transactionPage') updateCategory();
-        loadSummaryData();
+    function saveData() {
+        localStorage.setItem('my_txs', JSON.stringify(db.transactions));
+        localStorage.setItem('my_cats', JSON.stringify(db.categories));
+        localStorage.setItem('my_projs', JSON.stringify(db.projects));
     }
 
-    function updateCategory() {
-        const type = document.getElementById('transType').value;
-        const categorySelect = document.getElementById('transCategory');
-        categorySelect.innerHTML = '';
+    let incChart = null, expChart = null;
+    const colors = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 
-        let options = (type === 'รายจ่าย') 
-            ? ['ของกิน', 'ของใช้', 'ฟุ่มเฟือย', 'อื่นๆ (เพิ่มเอง)'] 
-            : ['เงินเดือน', 'แม่ให้', 'อื่นๆ (เพิ่มเอง)'];
+    window.onload = function() {
+        document.getElementById('tx-date').valueAsDate = new Date();
+        initYearDropdown();
+        populateCategoryDropdown();
+        populateProjectDropdowns();
+        renderDashboard();
+        renderCategoryList();
+        renderProjectSummary();
+    };
 
-        options.forEach(opt => {
-            let newOption = document.createElement('option');
-            newOption.value = opt;
-            newOption.innerText = opt;
-            categorySelect.appendChild(newOption);
-        });
-        checkCustomCategory();
+    function switchView(viewName) {
+        document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.nav-btns .btn').forEach(el => el.classList.remove('active'));
+        document.getElementById(`view-${viewName}`).classList.add('active');
+        event.target.classList.add('active');
+
+        if(viewName === 'dashboard') renderDashboard();
+        if(viewName === 'categories') renderCategoryList();
+        if(viewName === 'projects') renderProjectSummary();
     }
 
-    function checkCustomCategory() {
-        const categorySelect = document.getElementById('transCategory').value;
-        const customInput = document.getElementById('customCategory');
-        if (categorySelect === 'อื่นๆ (เพิ่มเอง)') {
-            customInput.style.display = 'block';
-        } else {
-            customInput.style.display = 'none';
-            customInput.value = '';
+    function initYearDropdown() {
+        const yearSelect = document.getElementById('filter-year');
+        const currentYear = new Date().getFullYear();
+        yearSelect.innerHTML = '<option value="">-- ทุกปี --</option>';
+        for(let y = currentYear; y >= currentYear - 3; y--) {
+            yearSelect.innerHTML += `<option value="${y}" ${y === 2025 ? 'selected' : ''}>${y}</option>`;
         }
     }
 
-    // โหลดข้อมูลสรุปจาก Google Sheets มาแสดง
-    function loadSummaryData() {
-        fetch(GAS_URL)
-        .then(res => res.json())
-        .then(data => {
-            document.getElementById('sumIncome').innerText = '฿' + Number(data.income).toLocaleString();
-            document.getElementById('sumExpense').innerText = '฿' + Number(data.expense).toLocaleString();
-            document.getElementById('sumBalance').innerText = '฿' + Number(data.balance).toLocaleString();
-
-            const tbody = document.getElementById('stockTableBody');
-            const stockTextDiv = document.getElementById('stockTextSummary');
-            tbody.innerHTML = '';
-            stockTextDiv.innerHTML = '';
-
-            if (!data.stocks || data.stocks.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="4">ยังไม่มีข้อมูลหุ้น</td></tr>';
-                stockTextDiv.innerHTML = 'ยังไม่มีข้อมูลหุ้นในพอร์ต';
-            } else {
-                let stockNames = [];
-                let stockCosts = [];
-
-                data.stocks.forEach(st => {
-                    let tr = `<tr>
-                        <td><strong>${st.symbol}</strong></td>
-                        <td>${Number(st.totalShares).toLocaleString()}</td>
-                        <td>฿${Number(st.totalCost).toLocaleString()}</td>
-                        <td>฿${Number(st.avgPrice).toFixed(2)}</td>
-                    </tr>`;
-                    tbody.innerHTML += tr;
-
-                    stockTextDiv.innerHTML += `<div><span>• ${st.symbol} (${Number(st.totalShares).toLocaleString()} หุ้น):</span> <strong>฿${Number(st.totalCost).toLocaleString()}</strong></div>`;
-
-                    stockNames.push(st.symbol);
-                    stockCosts.push(st.totalCost);
-                });
-
-                // วาดกราฟวงกลมพอร์ตหุ้น
-                renderStockChart(stockNames, stockCosts);
-            }
-        })
-        .catch(err => console.log("กำลังรอโหลดข้อมูล..."));
+    function populateCategoryDropdown() {
+        const type = document.getElementById('tx-type').value;
+        const catSelect = document.getElementById('tx-category');
+        catSelect.innerHTML = '';
+        db.categories.filter(c => c.type === type).forEach(c => {
+            catSelect.innerHTML += `<option value="${c.name}">${c.name}</option>`;
+        });
     }
 
-    function submitTransaction() {
-        const type = document.getElementById('transType').value;
-        let category = document.getElementById('transCategory').value;
-        if(category === 'อื่นๆ (เพิ่มเอง)') category = document.getElementById('customCategory').value;
-        const amount = parseFloat(document.getElementById('transAmount').value);
-        const note = document.getElementById('transNote').value;
-
-        if(!amount || !category) { alert('กรุณากรอกข้อมูลให้ครบถ้วน'); return; }
-
-        localTransactions.push({ type: type, category: category, amount: amount });
-
-        const payload = { action: "transaction", type: type, category: category, amount: amount, note: note };
+    function populateProjectDropdowns() {
+        const projSelect = document.getElementById('tx-project');
+        const filterProjSelect = document.getElementById('filter-project');
         
-        sendData(payload, 'btnTransSubmit', 'transLoading', function() {
-            // อัปเดตข้อความสรุป และ กราฟวงกลมรายจ่าย
-            updateTransSummaryUI();
+        projSelect.innerHTML = '<option value="">-- ไม่ระบุโปรเจกต์ --</option>';
+        filterProjSelect.innerHTML = '<option value="">-- ทุกโปรเจกต์ --</option>';
 
-            document.getElementById('transAmount').value = '';
-            document.getElementById('transNote').value = '';
-            alert('✅ บันทึกรายการเรียบร้อยแล้ว!');
+        db.projects.forEach(p => {
+            projSelect.innerHTML += `<option value="${p}">${p}</option>`;
+            filterProjSelect.innerHTML += `<option value="${p}">${p}</option>`;
         });
     }
 
-    // อัปเดตข้อความสรุปและกราฟวงกลมของฝั่ง รายรับ-รายจ่าย
-    function updateTransSummaryUI() {
-        let catSummary = {};
-        let expCategories = {};
+    function renderDashboard() {
+        const y = document.getElementById('filter-year').value;
+        const m = document.getElementById('filter-month').value;
+        const p = document.getElementById('filter-project').value;
 
-        localTransactions.forEach(item => {
-            if (!catSummary[item.category]) catSummary[item.category] = 0;
-            catSummary[item.category] += item.amount;
+        let filtered = db.transactions.filter(tx => {
+            const d = new Date(tx.date);
+            if (y && d.getFullYear() != parseInt(y)) return false;
+            if (m && (d.getMonth() + 1) != parseInt(m)) return false;
+            if (p && tx.project !== p) return false;
+            return true;
+        });
 
-            if (item.type === 'รายจ่าย') {
-                if (!expCategories[item.category]) expCategories[item.category] = 0;
-                expCategories[item.category] += item.amount;
+        // สรุปยอด
+        let totalInc = 0, totalExp = 0;
+        let incCats = {}, expCats = {};
+
+        filtered.forEach(tx => {
+            if (tx.type === 'รายรับ') {
+                totalInc += tx.amount;
+                incCats[tx.category] = (incCats[tx.category] || 0) + tx.amount;
+            } else {
+                totalExp += tx.amount;
+                expCats[tx.category] = (expCats[tx.category] || 0) + tx.amount;
             }
         });
 
-        // 1. อัปเดตข้อความสรุป
-        const textDiv = document.getElementById('transTextSummary');
-        textDiv.innerHTML = '';
-        for (let cat in catSummary) {
-            textDiv.innerHTML += `<div><span>• ${cat}:</span> <strong>฿${catSummary[cat].toLocaleString()}</strong></div>`;
+        document.getElementById('sum-inc').innerText = '฿' + totalInc.toLocaleString();
+        document.getElementById('sum-exp').innerText = '฿' + totalExp.toLocaleString();
+        document.getElementById('sum-bal').innerText = '฿' + (totalInc - totalExp).toLocaleString();
+
+        // ตาราง
+        const tbody = document.getElementById('tx-table-body');
+        tbody.innerHTML = '';
+        if (filtered.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">ไม่พบข้อมูล</td></tr>';
+        } else {
+            filtered.sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(tx => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${tx.date}</td>
+                    <td><span class="badge ${tx.type === 'รายรับ' ? 'badge-inc' : 'badge-exp'}">${tx.type}</span></td>
+                    <td><strong>${tx.item}</strong></td>
+                    <td>${tx.category}</td>
+                    <td>${tx.project || '-'}</td>
+                    <td class="text-right">฿${tx.amount.toLocaleString()}</td>
+                    <td class="text-right"><button class="btn btn-danger" style="padding:2px 6px; font-size:0.75rem;" onclick="handleDeleteTx(${tx.id})">ลบ</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
         }
 
-        // 2. อัปเดตกราฟวงกลม
-        const labels = Object.keys(expCategories);
-        const values = Object.values(expCategories);
-        if (labels.length > 0) {
-            renderExpenseChart(labels, values);
-        }
+        // วาดกราฟ
+        renderPieChart('incPieChart', incChart, incCats, (c) => incChart = c);
+        renderPieChart('expPieChart', expChart, expCats, (c) => expChart = c);
     }
 
-    // วาดกราฟวงกลม รายจ่าย
-    function renderExpenseChart(labels, dataValues) {
-        const ctx = document.getElementById('expensePieChart').getContext('2d');
-        if (myExpenseChart) myExpenseChart.destroy();
+    function renderPieChart(canvasId, chartInstance, catData, setChartFn) {
+        const ctx = document.getElementById(canvasId).getContext('2d');
+        if (chartInstance) chartInstance.destroy();
 
-        myExpenseChart = new Chart(ctx, {
+        const labels = Object.keys(catData);
+        const data = Object.values(catData);
+
+        if (labels.length === 0) {
+            ctx.clearRect(0, 0, 300, 300);
+            return;
+        }
+
+        const newChart = new Chart(ctx, {
             type: 'pie',
             data: {
                 labels: labels,
-                datasets: [{ data: dataValues, backgroundColor: chartColors.slice(0, labels.length) }]
+                datasets: [{ data: data, backgroundColor: colors.slice(0, labels.length) }]
             },
             options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
         });
+        setChartFn(newChart);
     }
 
-    // วาดกราฟวงกลม พอร์ตหุ้น
-    function renderStockChart(labels, dataValues) {
-        const ctx = document.getElementById('stockPieChart').getContext('2d');
-        if (myStockChart) myStockChart.destroy();
+    function handleSaveTx(e) {
+        e.preventDefault();
+        const newTx = {
+            id: Date.now(),
+            date: document.getElementById('tx-date').value,
+            type: document.getElementById('tx-type').value,
+            category: document.getElementById('tx-category').value,
+            item: document.getElementById('tx-item').value,
+            amount: parseFloat(document.getElementById('tx-amount').value),
+            project: document.getElementById('tx-project').value
+        };
+        db.transactions.push(newTx);
+        saveData();
+        alert('✅ บันทึกรายการเรียบร้อย');
+        document.getElementById('tx-item').value = '';
+        document.getElementById('tx-amount').value = '';
+        switchView('dashboard');
+    }
 
-        myStockChart = new Chart(ctx, {
-            type: 'pie',
-            data: {
-                labels: labels,
-                datasets: [{ data: dataValues, backgroundColor: chartColors.slice(0, labels.length) }]
-            },
-            options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+    function handleDeleteTx(id) {
+        if (confirm('ยืนยันการลบรายการนี้?')) {
+            db.transactions = db.transactions.filter(t => t.id !== id);
+            saveData();
+            renderDashboard();
+        }
+    }
+
+    function handleAddCategory(e) {
+        e.preventDefault();
+        const name = document.getElementById('cat-name').value.trim();
+        const type = document.getElementById('cat-type').value;
+
+        if (db.categories.some(c => c.name === name && c.type === type)) {
+            alert('❌ มีหมวดหมู่นี้อยู่แล้ว');
+            return;
+        }
+        db.categories.push({ name, type });
+        saveData();
+        document.getElementById('cat-name').value = '';
+        populateCategoryDropdown();
+        renderCategoryList();
+        alert('✅ เพิ่มหมวดหมู่เรียบร้อย');
+    }
+
+    function renderCategoryList() {
+        const tbody = document.getElementById('cat-table-body');
+        tbody.innerHTML = '';
+        db.categories.forEach((c, idx) => {
+            tbody.innerHTML += `
+                <tr>
+                    <td>${c.name}</td>
+                    <td><span class="badge ${c.type === 'รายรับ' ? 'badge-inc' : 'badge-exp'}">${c.type}</span></td>
+                    <td><button class="btn btn-danger" style="padding:2px 6px; font-size:0.75rem;" onclick="handleDeleteCat(${idx})">ลบ</button></td>
+                </tr>
+            `;
         });
     }
 
-    function submitStock() {
-        const name = document.getElementById('stockName').value.toUpperCase();
-        const action = document.getElementById('stockAction').value;
-        const shares = document.getElementById('stockShares').value;
-        const price = document.getElementById('stockPrice').value;
-
-        if(!name || !shares || !price) { alert('กรุณากรอกข้อมูลหุ้นให้ครบถ้วน'); return; }
-
-        const payload = { action: "stock", name: name, stockAction: action, shares: shares, price: price };
-        sendData(payload, 'btnStockSubmit', 'stockLoading', function() {
-            const total = (parseFloat(shares) * parseFloat(price)).toLocaleString();
-            alert(`✅ บันทึกการออมหุ้นสำเร็จ!\n\n📈 หุ้น: ${name}\n📝 รายการ: ${action === 'buy' ? 'ซื้อ' : 'ขาย'}\n🔢 จำนวน: ${shares} หุ้น\n💵 ยอดรวม: ฿${total}`);
-            
-            document.getElementById('stockName').value = '';
-            document.getElementById('stockShares').value = '';
-            document.getElementById('stockPrice').value = '';
-        });
+    function handleDeleteCat(idx) {
+        if(confirm('ยืนยันลบหมวดหมู่นี้?')) {
+            db.categories.splice(idx, 1);
+            saveData();
+            populateCategoryDropdown();
+            renderCategoryList();
+        }
     }
 
-    function sendData(payload, btnId, loadingId, onSuccessCallback) {
-        const btn = document.getElementById(btnId);
-        const loading = document.getElementById(loadingId);
+    function handleAddProject(e) {
+        e.preventDefault();
+        const name = document.getElementById('proj-name').value.trim();
+        if (db.projects.includes(name)) {
+            alert('❌ มีโปรเจกต์นี้อยู่แล้ว');
+            return;
+        }
+        db.projects.push(name);
+        saveData();
+        document.getElementById('proj-name').value = '';
+        populateProjectDropdowns();
+        renderProjectSummary();
+        alert('✅ เพิ่มโปรเจกต์เรียบร้อย');
+    }
 
-        btn.disabled = true;
-        loading.style.display = 'block';
+    function renderProjectSummary() {
+        const tbody = document.getElementById('proj-summary-body');
+        tbody.innerHTML = '';
 
-        fetch(GAS_URL, { 
-            method: "POST", 
-            mode: "no-cors",
-            headers: { "Content-Type": "text/plain" },
-            body: JSON.stringify(payload) 
-        })
-        .then(() => {
-            btn.disabled = false;
-            loading.style.display = 'none';
-            onSuccessCallback();
-            setTimeout(loadSummaryData, 1500);
-        })
-        .catch(err => {
-            btn.disabled = false;
-            loading.style.display = 'none';
-            alert('❌ เกิดข้อผิดพลาด: ' + err);
+        db.projects.forEach(p => {
+            let inc = 0, exp = 0;
+            db.transactions.filter(t => t.project === p).forEach(t => {
+                if(t.type === 'รายรับ') inc += t.amount;
+                else exp += t.amount;
+            });
+            let net = inc - exp;
+            tbody.innerHTML += `
+                <tr>
+                    <td><strong>${p}</strong></td>
+                    <td class="text-right" style="color:var(--income);">฿${inc.toLocaleString()}</td>
+                    <td class="text-right" style="color:var(--expense);">฿${exp.toLocaleString()}</td>
+                    <td class="text-right" style="font-weight:bold; color:${net >= 0 ? 'var(--income)' : 'var(--expense)'};">฿${net.toLocaleString()}</td>
+                </tr>
+            `;
         });
     }
 </script>
