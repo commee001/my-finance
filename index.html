@@ -373,7 +373,7 @@
 </div>
 
 <script>
-    // Config Firebase ของคุณ
+    // Config Firebase
     const firebaseConfig = {
         apiKey: "AIzaSyC-xC30S0XAyItbK4o5p2IuvGyP3MfGqmQ",
         authDomain: "my-finance-1d9f6.firebaseapp.com",
@@ -394,7 +394,7 @@
     let appData = {
         transactions: [],
         stocks: [],
-        stockSymbols: ['BRK.B', 'PTT', 'AOT', 'NVDA', 'AAPL'], // หมวดหมู่ชื่อหุ้นสะสม
+        stockSymbols: ['BRK.B', 'PTT', 'AOT', 'NVDA', 'AAPL'],
         categories: [
             { name: 'เงินเดือนหลัก', type: 'รายรับ' }, { name: 'เงินโบนัส', type: 'รายรับ' },
             { name: 'ดอกเบี้ย', type: 'รายรับ' }, { name: 'เงินปันผล', type: 'รายรับ' },
@@ -428,11 +428,29 @@
         }
     });
 
+    // ดึงข้อมูลกรณีเปลี่ยนกลับมาจาก Redirect บนมือถือ
+    auth.getRedirectResult().catch(err => {
+        if (err.code && err.code !== 'auth/popup-closed-by-user') {
+            console.error("Redirect Error:", err);
+        }
+    });
+
+    // ล็อกอินด้วย Google (รองรับทั้ง PC และ มือถือ/Safari)
     function handleGoogleLogin() {
         const provider = new firebase.auth.GoogleAuthProvider();
-        auth.signInWithPopup(provider).catch(err => {
-            alert('❌ เข้าสู่ระบบ Google ไม่สำเร็จ: ' + err.message);
-        });
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        
+        if (isMobile) {
+            auth.signInWithRedirect(provider);
+        } else {
+            auth.signInWithPopup(provider).catch(err => {
+                if (err.code === 'auth/popup-blocked' || err.message.includes('missing initial state')) {
+                    auth.signInWithRedirect(provider);
+                } else {
+                    alert('❌ เข้าสู่ระบบ Google ไม่สำเร็จ: ' + err.message);
+                }
+            });
+        }
     }
 
     function toggleAuthMode() {
@@ -544,12 +562,10 @@
         });
     }
 
-    // จัดการระบบตัวเลือกหุ้น (Stock Select)
     function populateStockDropdown() {
         const select = document.getElementById('stock-select');
         select.innerHTML = '<option value="">-- เลือกชื่อหุ้น --</option>';
         
-        // ดึงชื่อหุ้นที่มีทั้งหมดมาใส่ใน Dropdown
         appData.stockSymbols.forEach(sym => {
             select.innerHTML += `<option value="${sym}">${sym}</option>`;
         });
@@ -688,7 +704,6 @@
                 alert('⚠️ กรุณาระบุชื่อหุ้นใหม่');
                 return;
             }
-            // เพิ่มชื่อหุ้นใหม่เข้าหมวดหมู่สะสม
             if (!appData.stockSymbols.includes(selectedSymbol)) {
                 appData.stockSymbols.push(selectedSymbol);
             }
